@@ -1,0 +1,1 @@
+initial placeholder for smart contract management solution readme

@@ -1,0 +1,27 @@
+{
+  "name": "@turnkey/smart-contract-mgmt",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "deploy": "tsx src/deploy.ts",
+    "verify-deploy": "tsx src/verifyDeploy.ts",
+    "mint": "tsx src/mint.ts",
+    "upgrade": "tsx src/upgrade.ts",
+    "clean": "rimraf ./dist ./.cache",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@turnkey/sdk-server": "^5.0.1",
+    "@turnkey/viem": "^0.14.21",
+    "dotenv": "^16.4.5",
+    "viem": "^2.24.2"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "5.4.3"
+  }
+}
