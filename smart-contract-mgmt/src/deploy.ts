@@ -14,6 +14,7 @@ import {
   type Hex,
 } from "viem";
 import { sepolia } from "viem/chains";
+import { toLowercaseAddress } from "./address";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -43,14 +44,14 @@ async function main() {
   const turnkeyAccount = await createAccount({
     client: turnkeyClient.apiClient(),
     organizationId: process.env.ORGANIZATION_ID!,
-    signWith: process.env.DEPLOYER_ADDRESS!,
+    signWith: toLowercaseAddress(process.env.DEPLOYER_ADDRESS!),
   });
 
   const rpcUrl =
     process.env.SEPOLIA_RPC_URL ?? "https://1rpc.io/sepolia";
   // Token owner = who can mint (TKDemo.initialize(owner)). Proxy admin = who can upgrade (separate).
-  const tokenOwner = process.env.TOKEN_OWNER! as Hex;
-  const upgradeAddress = process.env.UPGRADE_ADDRESS! as Hex;
+  const tokenOwner = toLowercaseAddress(process.env.TOKEN_OWNER!);
+  const upgradeAddress = toLowercaseAddress(process.env.UPGRADE_ADDRESS!);
 
   console.log("Running Foundry clean & build...");
   runForge(["clean"]);
@@ -88,7 +89,8 @@ async function main() {
   if (!implementationAddress) {
     throw new Error("Implementation deployment did not create a contract");
   }
-  console.log("Implementation at:", implementationAddress);
+  const implementationAddressLower = toLowercaseAddress(implementationAddress);
+  console.log("Implementation at:", implementationAddressLower);
 
   const initData = encodeFunctionData({
     abi: tkDemoRaw.abi as readonly unknown[],
@@ -100,7 +102,7 @@ async function main() {
   const proxyDeployData = encodeDeployData({
     abi: proxyRaw.abi as readonly unknown[],
     bytecode: proxyBytecode,
-    args: [implementationAddress, upgradeAddress, initData],
+    args: [implementationAddressLower, upgradeAddress, initData],
   });
   // Cast: same as above (viem Sepolia + sendTransaction typing).
   const proxyTxHash = await client.sendTransaction({
@@ -113,12 +115,13 @@ async function main() {
   if (!proxyAddress) {
     throw new Error("Proxy deployment did not create a contract");
   }
+  const proxyAddressLower = toLowercaseAddress(proxyAddress);
 
-  console.log("Proxy (TKDemo) at:", proxyAddress);
+  console.log("Proxy (TKDemo) at:", proxyAddressLower);
   const deployOutputPath = path.join(__dirname, "..", "deploy-output.json");
   fs.writeFileSync(
     deployOutputPath,
-    JSON.stringify({ proxyAddress, implementationAddress }, null, 2)
+    JSON.stringify({ proxyAddress: proxyAddressLower, implementationAddress: implementationAddressLower }, null, 2)
   );
   console.log("Wrote", deployOutputPath, "(for verifyDeploy)");
   console.log("Done.");
