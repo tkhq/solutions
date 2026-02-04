@@ -21,7 +21,6 @@ import {
   type Hex,
 } from "viem";
 import { sepolia } from "viem/chains";
-import { toLowercaseAddress } from "./address";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -56,21 +55,15 @@ function runForge(args: string[], cwd: string = FOUNDRY_DIR): void {
 }
 
 function getProxyAddress(): string {
-  const raw =
-    process.env.PROXY_ADDRESS?.trim() ||
-    (() => {
-      try {
-        const d = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
-        return d.proxyAddress ?? "";
-      } catch {
-        return "";
-      }
-    })();
-  if (!raw) {
-    console.error("Proxy address not found. Run deploy first or set PROXY_ADDRESS.");
-    process.exit(1);
+  if (process.env.PROXY_ADDRESS?.trim()) return process.env.PROXY_ADDRESS.trim();
+  try {
+    const d = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
+    if (d.proxyAddress) return d.proxyAddress;
+  } catch {
+    /* ignore */
   }
-  return toLowercaseAddress(raw);
+  console.error("Proxy address not found. Run deploy first or set PROXY_ADDRESS.");
+  process.exit(1);
 }
 
 async function main() {
@@ -97,7 +90,7 @@ async function main() {
   const upgradeAccount = (await createAccount({
     client: turnkeyClient.apiClient(),
     organizationId: process.env.ORGANIZATION_ID!,
-    signWith: toLowercaseAddress(process.env.UPGRADE_ADDRESS!),
+    signWith: process.env.UPGRADE_ADDRESS!,
   })) as Account;
 
   const transport = http(rpcUrl);
@@ -121,14 +114,13 @@ async function main() {
   if (implReceipt.status === "reverted") throw new Error("Implementation deploy reverted");
   const newImplementationAddress = implReceipt.contractAddress;
   if (!newImplementationAddress) throw new Error("Implementation deploy did not create a contract");
-  const newImplementationAddressLower = toLowercaseAddress(newImplementationAddress);
 
   // 2) Upgrade via ProxyAdmin
   const upgradeHash = await walletClient.writeContract({
     address: proxyAdminAddress,
     abi: proxyAdminRaw.abi,
     functionName: "upgradeAndCall",
-    args: [proxyAddress, newImplementationAddressLower, "0x" as Hex],
+    args: [proxyAddress, newImplementationAddress, "0x" as Hex],
   } as unknown as Parameters<typeof walletClient.writeContract>[0]);
 
   const upgradeReceipt = await publicClient.waitForTransactionReceipt({ hash: upgradeHash });
@@ -138,9 +130,9 @@ async function main() {
     proxyAddress: string;
     implementationAddress: string;
   };
-  deployOutput.implementationAddress = newImplementationAddressLower;
+  deployOutput.implementationAddress = newImplementationAddress;
   fs.writeFileSync(DEPLOY_OUTPUT, JSON.stringify(deployOutput, null, 2));
-  console.log("Done. Proxy implementation:", newImplementationAddressLower, "→ run verify-deploy to confirm.");
+  console.log("Done. Proxy implementation:", newImplementationAddress, "→ run verify-deploy to confirm.");
 }
 
 main().catch((err) => {

@@ -9,7 +9,6 @@ import * as dotenv from "dotenv";
 import * as fs from "node:fs";
 import { createPublicClient, http } from "viem";
 import { sepolia } from "viem/chains";
-import { toLowercaseAddress } from "./address";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -30,21 +29,17 @@ type AbiItem = {
 };
 
 function getProxyAddress(): string {
-  const raw =
-    process.env.PROXY_ADDRESS?.trim() ||
-    (() => {
-      try {
-        const data = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
-        return data.proxyAddress ?? "";
-      } catch {
-        return "";
-      }
-    })();
-  if (!raw) {
-    console.error("Proxy address not found. Run deploy first (writes deploy-output.json) or set PROXY_ADDRESS in .env");
-    process.exit(1);
+  if (process.env.PROXY_ADDRESS?.trim()) {
+    return process.env.PROXY_ADDRESS.trim();
   }
-  return toLowercaseAddress(raw);
+  try {
+    const data = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
+    if (data.proxyAddress) return data.proxyAddress;
+  } catch {
+    // ignore
+  }
+  console.error("Proxy address not found. Run deploy first (writes deploy-output.json) or set PROXY_ADDRESS in .env");
+  process.exit(1);
 }
 
 function getDeployOutput(): { proxyAddress?: string; implementationAddress?: string } {

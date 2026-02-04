@@ -12,7 +12,6 @@ import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
 import { createAccount } from "@turnkey/viem";
 import { createPublicClient, createWalletClient, http, type Account, type Hex } from "viem";
 import { sepolia } from "viem/chains";
-import { toLowercaseAddress } from "./address";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -23,35 +22,28 @@ const DEPLOY_OUTPUT = path.join(__dirname, "..", "deploy-output.json");
 const MINT_AMOUNT = 100n * 10n ** 18n; // 100 tokens (18 decimals)
 
 function getProxyAddress(): string {
-  const raw =
-    process.env.PROXY_ADDRESS?.trim() ||
-    (() => {
-      try {
-        const data = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
-        return data.proxyAddress ?? "";
-      } catch {
-        return "";
-      }
-    })();
-  if (!raw) {
-    console.error("Proxy address not found. Run deploy first or set PROXY_ADDRESS in .env");
-    process.exit(1);
+  if (process.env.PROXY_ADDRESS?.trim()) return process.env.PROXY_ADDRESS.trim();
+  try {
+    const data = JSON.parse(fs.readFileSync(DEPLOY_OUTPUT, "utf8"));
+    if (data.proxyAddress) return data.proxyAddress;
+  } catch {
+    // ignore
   }
-  return toLowercaseAddress(raw);
+  console.error("Proxy address not found. Run deploy first or set PROXY_ADDRESS in .env");
+  process.exit(1);
 }
 
 async function main() {
   const recipientArg = process.argv[2]?.trim();
-  const recipientRaw =
+  const recipient =
     recipientArg && recipientArg.startsWith("0x")
       ? recipientArg
       : (process.env.TOKEN_OWNER?.trim() ?? "");
-  if (!recipientRaw || !recipientRaw.startsWith("0x")) {
+  if (!recipient || !recipient.startsWith("0x")) {
     console.error("Usage: pnpm run mint [recipient-address]");
     console.error("If no address is provided, TOKEN_OWNER from .env is used.");
     process.exit(1);
   }
-  const recipient = toLowercaseAddress(recipientRaw);
 
   const proxyAddress = getProxyAddress() as Hex;
   const rpcUrl = process.env.SEPOLIA_RPC_URL ?? "https://1rpc.io/sepolia";
@@ -66,7 +58,7 @@ async function main() {
   const tokenOwnerAccount = await createAccount({
     client: turnkeyClient.apiClient(),
     organizationId: process.env.ORGANIZATION_ID!,
-    signWith: toLowercaseAddress(process.env.TOKEN_OWNER!),
+    signWith: process.env.TOKEN_OWNER!,
   });
 
   const artifact = JSON.parse(fs.readFileSync(TKDEMO_ARTIFACT, "utf8")) as { abi: readonly unknown[] };
@@ -88,7 +80,7 @@ async function main() {
       address: proxyAddress,
       abi: artifact.abi,
       functionName: "mint",
-      args: [recipient, MINT_AMOUNT],
+      args: [recipient as Hex, MINT_AMOUNT],
     } as unknown as Parameters<typeof walletClient.writeContract>[0]
   );
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
