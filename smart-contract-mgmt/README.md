@@ -1,8 +1,10 @@
-# Solution GTM: Smart Contract Management
+## Smart Contract Management
 
 ## Motivation
 
 With an incredible amount of value being created and exchanged on-chain, the largest Web3 apps and businesses rely on smart contracts for mission-critical functionality. Managing the deployment and long-term maintenance of these on-chain properties can be highly manual, and put signing keys near the front lines of risk. By pairing proven cryptographic primitives with industry-standard Role-Based Access Control (RBAC) least-privilege approaches we can create highly secure, predictable, and flexible solutions.
+
+> The companion docs page [resides here](https://docs.turnkey.com//signing-automation/code-examples/smart-contract-management).
 
 ## Example
 
