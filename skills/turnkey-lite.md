@@ -1,6 +1,6 @@
 ---
 name: turnkey-lite
-description: Guide a user through the essential Turnkey onboarding flow: create a parent organization, create a wallet, create an API key user, and create a policy allowing that user to transact on the wallet.
+description: "Guide a user through the essential Turnkey onboarding flow: create a parent organization, create a wallet, create an API key user, and create a policy allowing that user to transact on the wallet."
 ---
 
 # Turnkey Lite Onboarding
