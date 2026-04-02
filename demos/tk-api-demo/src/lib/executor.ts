@@ -65,6 +65,53 @@ export function annotate(value: unknown, comment: string) {
   return { __value: value, __comment: comment }
 }
 
+// Returns the policy configuration for a given policy type.
+// Used by both buildDisplayRequest and executeCreatePolicy to stay in sync.
+function getPolicyConfig(params: { type?: string; allowedAddress?: string }): {
+  policyName: string
+  effect: 'EFFECT_ALLOW' | 'EFFECT_DENY'
+  condition: string
+} {
+  switch (params.type) {
+    case 'permissive':
+      return {
+        policyName: 'Permissive Signing Policy',
+        effect: 'EFFECT_ALLOW',
+        condition: 'true',
+      }
+    case 'sign-only':
+      return {
+        policyName: 'Sign Operations Only',
+        effect: 'EFFECT_ALLOW',
+        condition: "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' || activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'",
+      }
+    case 'allow-wallet-creation':
+      return {
+        policyName: 'Allow Wallet Creation',
+        effect: 'EFFECT_ALLOW',
+        condition: "activity.resource == 'WALLET' && activity.action == 'CREATE'",
+      }
+    case 'deny-all-deletes':
+      return {
+        policyName: 'Deny All Deletions',
+        effect: 'EFFECT_DENY',
+        condition: "activity.action == 'DELETE'",
+      }
+    case 'allow-auth':
+      return {
+        policyName: 'Allow Auth Activity',
+        effect: 'EFFECT_ALLOW',
+        condition: "activity.resource == 'AUTH' && activity.action == 'CREATE'",
+      }
+    default: // address-allowlist
+      return {
+        policyName: 'Address Allowlist',
+        effect: 'EFFECT_ALLOW',
+        condition: `eth.tx.to == '${params.allowedAddress?.toLowerCase() ?? '<address>'}'`,
+      }
+  }
+}
+
 // Builds the human-readable request shown in the UI — used both as a preview
 // before execution and as the logged request after execution.
 export function buildDisplayRequest(step: StepConfig, state: SessionState): unknown {
@@ -118,13 +165,15 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
       }
 
     case 'CREATE_POLICY': {
-      const { allowedAddress } = step.params as { allowedAddress: string }
+      const params = step.params as { type?: string; allowedAddress?: string }
+      const { policyName, effect, condition } = getPolicyConfig(params)
       return {
         organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        policyName: 'Address Allowlist',
-        effect: 'EFFECT_ALLOW',
+        policyName,
+        effect,
         consensus: `approvers.any(user, user.id == '${state.apiUserId ?? annotate('<apiUserId>', 'from step 3')}')`,
-        condition: `eth.tx.to == '${allowedAddress.toLowerCase()}'`,
+        condition,
+        notes: 'Created via Turnkey API demo',
       }
     }
 
@@ -149,6 +198,176 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
       }
     }
 
+    case 'SIGN_RAW_PAYLOAD': {
+      const message = 'Hello from the Turnkey API!'
+      const payloadHex = ethers.keccak256(ethers.toUtf8Bytes(message)).slice(2)
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        signWith: state.walletAddress ?? annotate('<walletAddress>', 'from step 2'),
+        payload: annotate(payloadHex, 'keccak256("Hello from the Turnkey API!")'),
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: annotate('HASH_FUNCTION_NO_OP', 'payload is already hashed'),
+      }
+    }
+
+    case 'GET_WHO_AM_I':
+      return {
+        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'parent org'),
+      }
+
+    case 'LIST_WALLETS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'GET_WALLET':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        walletId: state.walletId ?? annotate('<walletId>', 'from create wallet step'),
+      }
+
+    case 'LIST_USERS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'LIST_POLICIES':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'DELETE_POLICY':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        policyId: state.policyId ?? annotate('<policyId>', 'from create policy step'),
+      }
+
+    case 'CREATE_PRIVATE_KEY':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        privateKeys: [{
+          privateKeyName: 'Demo Private Key',
+          curve: 'CURVE_SECP256K1',
+          addressFormats: ['ADDRESS_FORMAT_ETHEREUM'],
+          privateKeyTags: [],
+        }],
+      }
+
+    case 'CREATE_WALLET_ACCOUNTS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        walletId: state.walletId ?? annotate('<walletId>', 'from create wallet step'),
+        accounts: [{
+          curve: 'CURVE_SECP256K1',
+          pathFormat: 'PATH_FORMAT_BIP32',
+          path: annotate("m/44'/60'/0'/0/1", 'second Ethereum account index'),
+          addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
+        }],
+      }
+
+    case 'CREATE_API_KEYS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userId: state.apiUserId ?? annotate('<apiUserId>', 'from create API user step'),
+        apiKeys: [{
+          apiKeyName: 'Additional API Key',
+          publicKey: annotate('<generated P256 public key>', 'ephemeral, generated at runtime'),
+          curveType: 'API_KEY_CURVE_P256',
+        }],
+      }
+
+    case 'DELETE_WALLETS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        walletIds: [state.walletId ?? annotate('<walletId>', 'from create wallet step')],
+        deleteWithoutExport: true,
+      }
+
+    case 'DELETE_USERS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userIds: [state.apiUserId ?? annotate('<apiUserId>', 'from create API user step')],
+      }
+
+    case 'UPDATE_WALLET':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        walletId: state.walletId ?? annotate('<walletId>', 'from create wallet step'),
+        walletName: 'Demo Wallet (updated)',
+      }
+
+    case 'UPDATE_POLICY': {
+      const policyCondition = "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' || activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        policyId: state.policyId ?? annotate('<policyId>', 'from create policy step'),
+        policyName: 'Updated Policy',
+        policyCondition,
+        policyConsensus: `approvers.any(user, user.id == '${state.apiUserId ?? annotate('<apiUserId>', 'from step 3')}')`,
+        policyEffect: 'EFFECT_ALLOW',
+        policyNotes: '',
+      }
+    }
+
+    case 'UPDATE_USER':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userId: state.apiUserId ?? annotate('<apiUserId>', 'from create API user step'),
+        userName: 'Demo API User (renamed)',
+        userTagIds: [],
+      }
+
+    case 'SIGN_RAW_PAYLOADS': {
+      const msgs = ['Payload 1: Hello from Turnkey', 'Payload 2: Batch signing demo']
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        signWith: state.walletAddress ?? annotate('<walletAddress>', 'from step 2'),
+        payloads: msgs.map((msg) =>
+          annotate(ethers.keccak256(ethers.toUtf8Bytes(msg)).slice(2), `keccak256("${msg}")`)
+        ),
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: 'HASH_FUNCTION_NO_OP',
+      }
+    }
+
+    case 'LIST_WALLET_ACCOUNTS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        walletId: state.walletId ?? annotate('<walletId>', 'from create wallet step'),
+      }
+
+    case 'LIST_ACTIVITIES':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'LIST_PRIVATE_KEYS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'GET_USER':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userId: state.apiUserId ?? annotate('<apiUserId>', 'from create API user step'),
+      }
+
+    case 'GET_POLICY':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        policyId: state.policyId ?? annotate('<policyId>', 'from create policy step'),
+      }
+
+    case 'GET_API_KEYS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'GET_CONFIGS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
     default:
       return {}
   }
@@ -156,29 +375,77 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
 
 export async function executeStep(
   step: StepConfig,
-  state: SessionState
+  state: SessionState,
+  overrideRequest?: Record<string, unknown>
 ): Promise<StepResult> {
+  const ov = overrideRequest
   switch (step.kind) {
     case 'CREATE_SUB_ORG':
-      return executeCreateSubOrg(step, state)
+      return executeCreateSubOrg(step, state, ov)
     case 'CREATE_WALLET':
-      return executeCreateWallet(step, state)
+      return executeCreateWallet(step, state, ov)
     case 'CREATE_API_USER':
-      return executeCreateApiUser(step, state)
+      return executeCreateApiUser(step, state, ov)
     case 'CREATE_POLICY':
-      return executeCreatePolicy(step, state, step.params as { allowedAddress: string })
+      return executeCreatePolicy(step, state, step.params as { type?: string; allowedAddress?: string }, ov)
     case 'SIGN_TRANSACTION':
-      return executeSignTransaction(step, state, step.params as { useAllowedAddress: boolean })
+      return executeSignTransaction(step, state, step.params as { useAllowedAddress: boolean }, ov)
+    case 'SIGN_RAW_PAYLOAD':
+      return executeSignRawPayload(step, state, ov)
+    case 'GET_WHO_AM_I':
+      return executeGetWhoAmI(step, state, ov)
+    case 'LIST_WALLETS':
+      return executeListWallets(step, state, ov)
+    case 'GET_WALLET':
+      return executeGetWallet(step, state, ov)
+    case 'LIST_USERS':
+      return executeListUsers(step, state, ov)
+    case 'LIST_POLICIES':
+      return executeListPolicies(step, state, ov)
+    case 'DELETE_POLICY':
+      return executeDeletePolicy(step, state, ov)
+    case 'CREATE_PRIVATE_KEY':
+      return executeCreatePrivateKey(step, state, ov)
+    case 'CREATE_WALLET_ACCOUNTS':
+      return executeCreateWalletAccounts(step, state, ov)
+    case 'CREATE_API_KEYS':
+      return executeCreateApiKeys(step, state, ov)
+    case 'DELETE_WALLETS':
+      return executeDeleteWallets(step, state, ov)
+    case 'DELETE_USERS':
+      return executeDeleteUsers(step, state, ov)
+    case 'UPDATE_WALLET':
+      return executeUpdateWallet(step, state, ov)
+    case 'UPDATE_POLICY':
+      return executeUpdatePolicy(step, state, ov)
+    case 'UPDATE_USER':
+      return executeUpdateUser(step, state, ov)
+    case 'SIGN_RAW_PAYLOADS':
+      return executeSignRawPayloads(step, state, ov)
+    case 'LIST_WALLET_ACCOUNTS':
+      return executeListWalletAccounts(step, state, ov)
+    case 'LIST_ACTIVITIES':
+      return executeListActivities(step, state, ov)
+    case 'LIST_PRIVATE_KEYS':
+      return executeListPrivateKeys(step, state, ov)
+    case 'GET_USER':
+      return executeGetUser(step, state, ov)
+    case 'GET_POLICY':
+      return executeGetPolicy(step, state, ov)
+    case 'GET_API_KEYS':
+      return executeGetApiKeys(step, state, ov)
+    case 'GET_CONFIGS':
+      return executeGetConfigs(step, state, ov)
     default:
       throw new Error(`Unknown step kind: ${(step as StepConfig).kind}`)
   }
 }
 
-async function executeCreateSubOrg(step: StepConfig, state: SessionState): Promise<StepResult> {
+async function executeCreateSubOrg(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
   const client = parentClient()
-  const subOrganizationName = `demo sub-org ${new Date().toISOString()}`
+  const subOrganizationName = (override?.subOrganizationName as string | undefined) ?? `demo sub-org ${new Date().toISOString()}`
 
-  const requestParams = {
+  const defaultParams = {
     organizationId: process.env.ORGANIZATION_ID!,
     subOrganizationName,
     rootUsers: [
@@ -197,6 +464,8 @@ async function executeCreateSubOrg(step: StepConfig, state: SessionState): Promi
     ],
     rootQuorumThreshold: 1,
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestParams = (override as any) ?? defaultParams
 
   try {
     const response = await client.createSubOrganization(requestParams)
@@ -217,14 +486,16 @@ async function executeCreateSubOrg(step: StepConfig, state: SessionState): Promi
   }
 }
 
-async function executeCreateWallet(step: StepConfig, state: SessionState): Promise<StepResult> {
+async function executeCreateWallet(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
   const client = subOrgClient(state.subOrgId!)
 
-  const requestParams = {
+  const defaultParams = {
     organizationId: state.subOrgId!,
     walletName: 'Demo Wallet',
     accounts: DEFAULT_ETHEREUM_ACCOUNTS,
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestParams = (override as any) ?? defaultParams
 
   try {
     const response = await client.createWallet(requestParams)
@@ -249,24 +520,39 @@ async function executeCreateWallet(step: StepConfig, state: SessionState): Promi
   }
 }
 
-async function executeCreateApiUser(step: StepConfig, state: SessionState): Promise<StepResult> {
+async function executeCreateApiUser(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
   const client = subOrgClient(state.subOrgId!)
+  // Always generate a fresh key pair — the private key must match the public key sent to Turnkey
+  // so that subsequent signing steps work. We inject publicKey into the override if present.
   const { privateKey, publicKey } = generateP256KeyPair()
 
-  const requestParams = {
+  const defaultParams = {
     organizationId: state.subOrgId!,
     apiOnlyUsers: [
       {
         userName: 'Demo API User',
         userTags: [],
-        apiKeys: [
-          {
-            apiKeyName: 'Demo API Key',
-            publicKey: publicKey,
-          },
-        ],
+        apiKeys: [{ apiKeyName: 'Demo API Key', publicKey }],
       },
     ],
+  }
+
+  let requestParams = defaultParams
+  if (override) {
+    const ovUsers = (override.apiOnlyUsers as Array<Record<string, unknown>> | undefined) ?? []
+    const ovUser = ovUsers[0] ?? {}
+    const ovKeys = (ovUser.apiKeys as Array<Record<string, unknown>> | undefined) ?? []
+    const ovKey = ovKeys[0] ?? {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    requestParams = {
+      ...defaultParams,
+      ...(override as any),
+      apiOnlyUsers: [{
+        ...defaultParams.apiOnlyUsers[0],
+        ...ovUser,
+        apiKeys: [{ ...defaultParams.apiOnlyUsers[0].apiKeys[0], ...ovKey, publicKey }],
+      }],
+    }
   }
 
   try {
@@ -296,23 +582,31 @@ async function executeCreateApiUser(step: StepConfig, state: SessionState): Prom
 async function executeCreatePolicy(
   step: StepConfig,
   state: SessionState,
-  params: { allowedAddress: string }
+  params: { type?: string; allowedAddress?: string },
+  override?: Record<string, unknown>
 ): Promise<StepResult> {
   const client = subOrgClient(state.subOrgId!)
+  const { policyName, effect, condition } = getPolicyConfig(params)
   const { allowedAddress } = params
 
-  const requestParams = {
+  const defaultParams = {
     organizationId: state.subOrgId!,
-    policyName: 'Address Allowlist',
-    effect: 'EFFECT_ALLOW' as const,
+    policyName,
+    effect: effect as 'EFFECT_ALLOW' | 'EFFECT_DENY',
     consensus: `approvers.any(user, user.id == '${state.apiUserId}')`,
-    condition: `eth.tx.to == '${allowedAddress.toLowerCase()}'`,
-    notes: '',
+    condition,
+    notes: 'Created via Turnkey API demo',
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestParams = (override as any) ?? defaultParams
 
   try {
     const response = await client.createPolicy(requestParams)
-    const updatedState = { ...state, policyId: response.policyId, allowedAddress }
+    const updatedState = {
+      ...state,
+      policyId: response.policyId,
+      ...(allowedAddress ? { allowedAddress } : {}),
+    }
     return {
       success: true,
       request: buildDisplayRequest(step, updatedState),
@@ -332,20 +626,21 @@ async function executeCreatePolicy(
 async function executeSignTransaction(
   step: StepConfig,
   state: SessionState,
-  params: { useAllowedAddress: boolean }
+  params: { useAllowedAddress: boolean },
+  override?: Record<string, unknown>
 ): Promise<StepResult> {
   const targetAddress = params.useAllowedAddress
     ? state.allowedAddress!
     : '0x000000000000000000000000000000000000dEaD'
 
   const tx = new ethers.Transaction()
-  tx.to = targetAddress
-  tx.value = ethers.parseEther('0.001')
+  tx.to = (override?.to as string | undefined) ?? targetAddress
+  tx.value = ethers.parseEther((override?.value as string | undefined) ?? '0.001')
   tx.gasLimit = 21000n
   tx.maxFeePerGas = ethers.parseUnits('50', 'gwei')
   tx.maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
   tx.nonce = 0
-  tx.chainId = 1n
+  tx.chainId = override?.chainId ? BigInt(override.chainId as number) : 1n
   tx.type = 2
 
   const unsignedTransaction = tx.unsignedSerialized.slice(2) // strip 0x
@@ -360,8 +655,8 @@ async function executeSignTransaction(
 
   try {
     const response = await client.signTransaction({
-      organizationId: state.subOrgId!,
-      signWith: state.walletAddress!,
+      organizationId: (override?.organizationId as string | undefined) ?? state.subOrgId!,
+      signWith: (override?.signWith as string | undefined) ?? state.walletAddress!,
       unsignedTransaction,
       type: 'TRANSACTION_TYPE_ETHEREUM',
     })
@@ -380,5 +675,430 @@ async function executeSignTransaction(
       response: formatError(error),
       updatedState: state,
     }
+  }
+}
+
+async function executeSignRawPayload(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const message = 'Hello from the Turnkey API!'
+  const defaultPayload = ethers.keccak256(ethers.toUtf8Bytes(message)).slice(2) // hex without 0x
+
+  const client = apiUserClient(
+    state.apiUserPublicKey!,
+    state.apiUserPrivateKey!,
+    state.subOrgId!
+  )
+
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    signWith: state.walletAddress!,
+    payload: defaultPayload,
+    encoding: 'PAYLOAD_ENCODING_HEXADECIMAL' as const,
+    hashFunction: 'HASH_FUNCTION_NO_OP' as const,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestParams = (override as any) ?? defaultParams
+
+  try {
+    const response = await client.signRawPayload(requestParams)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeGetWhoAmI(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = parentClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: process.env.ORGANIZATION_ID! }
+  try {
+    const response = await client.getWhoami(params)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeListWallets(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getWallets(params)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeGetWallet(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, walletId: state.walletId! }
+  try {
+    const response = await client.getWallet(params)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeListUsers(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getUsers(params)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeListPolicies(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getPolicies(params)
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState: state,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeDeletePolicy(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, policyId: state.policyId! }
+  try {
+    const response = await client.deletePolicy(params)
+    const updatedState = { ...state, policyId: undefined }
+    return {
+      success: true,
+      request: buildDisplayRequest(step, state),
+      response: trimResponse(response),
+      updatedState,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      request: buildDisplayRequest(step, state),
+      response: formatError(error),
+      updatedState: state,
+    }
+  }
+}
+
+async function executeCreatePrivateKey(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    privateKeys: [{
+      privateKeyName: 'Demo Private Key',
+      curve: 'CURVE_SECP256K1',
+      addressFormats: ['ADDRESS_FORMAT_ETHEREUM'],
+      privateKeyTags: [],
+    }],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createPrivateKeys(params)
+    const updatedState = { ...state, privateKeyId: response.privateKeys?.[0]?.privateKeyId }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreateWalletAccounts(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    walletId: state.walletId!,
+    accounts: [{
+      curve: 'CURVE_SECP256K1',
+      pathFormat: 'PATH_FORMAT_BIP32',
+      path: "m/44'/60'/0'/0/1",
+      addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
+    }],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createWalletAccounts(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreateApiKeys(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const { privateKey: _priv, publicKey } = generateP256KeyPair()
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    userId: state.apiUserId!,
+    apiKeys: [{ apiKeyName: 'Additional API Key', publicKey, curveType: 'API_KEY_CURVE_P256' }],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createApiKeys(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeleteWallets(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    walletIds: [state.walletId!],
+    deleteWithoutExport: true,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deleteWallets(params)
+    const updatedState = { ...state, walletId: undefined, walletAddress: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeleteUsers(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, userIds: [state.apiUserId!] }
+  try {
+    const response = await client.deleteUsers(params)
+    const updatedState = { ...state, apiUserId: undefined, apiUserPublicKey: undefined, apiUserPrivateKey: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeUpdateWallet(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    walletId: state.walletId!,
+    walletName: 'Demo Wallet (updated)',
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.updateWallet(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeUpdatePolicy(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    policyId: state.policyId!,
+    policyName: 'Updated Policy',
+    policyCondition: "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' || activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'",
+    policyConsensus: `approvers.any(user, user.id == '${state.apiUserId}')`,
+    policyEffect: 'EFFECT_ALLOW' as const,
+    policyNotes: '',
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.updatePolicy(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeUpdateUser(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    userId: state.apiUserId!,
+    userName: 'Demo API User (renamed)',
+    userTagIds: [],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.updateUser(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeSignRawPayloads(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const messages = ['Payload 1: Hello from Turnkey', 'Payload 2: Batch signing demo']
+  const defaultPayloads = messages.map((msg) => ethers.keccak256(ethers.toUtf8Bytes(msg)).slice(2))
+  const client = apiUserClient(state.apiUserPublicKey!, state.apiUserPrivateKey!, state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    signWith: state.walletAddress!,
+    payloads: defaultPayloads,
+    encoding: 'PAYLOAD_ENCODING_HEXADECIMAL' as const,
+    hashFunction: 'HASH_FUNCTION_NO_OP' as const,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.signRawPayloads(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListWalletAccounts(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, walletId: state.walletId! }
+  try {
+    const response = await client.getWalletAccounts(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListActivities(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getActivities(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListPrivateKeys(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getPrivateKeys(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetUser(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, userId: state.apiUserId! }
+  try {
+    const response = await client.getUser(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetPolicy(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, policyId: state.policyId! }
+  try {
+    const response = await client.getPolicy(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetApiKeys(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getApiKeys(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetConfigs(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.getOrganizationConfigs(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
   }
 }
