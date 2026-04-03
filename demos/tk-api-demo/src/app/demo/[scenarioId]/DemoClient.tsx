@@ -22,6 +22,19 @@ const API_CALLS: Record<StepKind, { name: string; docs: string }> = {
   DELETE_POLICY:         { name: 'delete_policy',            docs: 'https://docs.turnkey.com/api-reference/activities/delete-policy' },
   DELETE_WALLETS:        { name: 'delete_wallets',           docs: 'https://docs.turnkey.com/api-reference/activities/delete-wallets' },
   DELETE_USERS:          { name: 'delete_users',             docs: 'https://docs.turnkey.com/api-reference/activities/delete-users' },
+  CREATE_USER_TAG:        { name: 'create_user_tag',         docs: 'https://docs.turnkey.com/api-reference/activities/create-user-tag' },
+  CREATE_PRIVATE_KEY_TAG: { name: 'create_private_key_tag',  docs: 'https://docs.turnkey.com/api-reference/activities/create-private-key-tag' },
+  CREATE_POLICIES:        { name: 'create_policies',         docs: 'https://docs.turnkey.com/api-reference/activities/create-policies' },
+  CREATE_INVITATIONS:     { name: 'create_invitations',      docs: 'https://docs.turnkey.com/api-reference/activities/create-invitations' },
+  DELETE_PRIVATE_KEYS:    { name: 'delete_private_keys',     docs: 'https://docs.turnkey.com/api-reference/activities/delete-private-keys' },
+  DELETE_API_KEYS:        { name: 'delete_api_keys',         docs: 'https://docs.turnkey.com/api-reference/activities/delete-api-keys' },
+  DELETE_USER_TAGS:       { name: 'delete_user_tags',        docs: 'https://docs.turnkey.com/api-reference/activities/delete-user-tags' },
+  DELETE_PRIVATE_KEY_TAGS:{ name: 'delete_private_key_tags', docs: 'https://docs.turnkey.com/api-reference/activities/delete-private-key-tags' },
+  DELETE_POLICIES:        { name: 'delete_policies',         docs: 'https://docs.turnkey.com/api-reference/activities/delete-policies' },
+  UPDATE_ROOT_QUORUM:     { name: 'update_root_quorum',      docs: 'https://docs.turnkey.com/api-reference/activities/update-root-quorum' },
+  UPDATE_ORGANIZATION_NAME:{ name: 'update_organization_name', docs: 'https://docs.turnkey.com/api-reference/activities/update-organization-name' },
+  SET_ORG_FEATURE:        { name: 'set_organization_feature', docs: 'https://docs.turnkey.com/api-reference/activities/set-organization-feature' },
+  REMOVE_ORG_FEATURE:     { name: 'remove_organization_feature', docs: 'https://docs.turnkey.com/api-reference/activities/remove-organization-feature' },
   // Queries
   GET_WHO_AM_I:          { name: 'get_whoami',               docs: 'https://docs.turnkey.com/api-reference/queries/who-am-i' },
   GET_WALLET:            { name: 'get_wallet',               docs: 'https://docs.turnkey.com/api-reference/queries/get-wallet' },
@@ -35,6 +48,13 @@ const API_CALLS: Record<StepKind, { name: string; docs: string }> = {
   LIST_POLICIES:         { name: 'get_policies',             docs: 'https://docs.turnkey.com/api-reference/queries/list-policies' },
   LIST_ACTIVITIES:       { name: 'get_activities',           docs: 'https://docs.turnkey.com/api-reference/queries/list-activities' },
   LIST_PRIVATE_KEYS:     { name: 'get_private_keys',         docs: 'https://docs.turnkey.com/api-reference/queries/list-private-keys' },
+  GET_PRIVATE_KEY:       { name: 'get_private_key',          docs: 'https://docs.turnkey.com/api-reference/queries/get-private-key' },
+  GET_AUTHENTICATORS:    { name: 'get_authenticators',       docs: 'https://docs.turnkey.com/api-reference/queries/get-authenticators' },
+  GET_SUB_ORGS:          { name: 'get_sub_org_ids',          docs: 'https://docs.turnkey.com/api-reference/queries/get-sub-organizations' },
+  GET_VERIFIED_SUB_ORGS: { name: 'get_verified_sub_org_ids', docs: 'https://docs.turnkey.com/api-reference/queries/get-verified-sub-organizations' },
+  LIST_USER_TAGS:        { name: 'list_user_tags',           docs: 'https://docs.turnkey.com/api-reference/queries/list-user-tags' },
+  LIST_PRIVATE_KEY_TAGS: { name: 'list_private_key_tags',    docs: 'https://docs.turnkey.com/api-reference/queries/list-private-key-tags' },
+  LIST_SUPPORTED_ASSETS: { name: 'list_supported_assets',    docs: 'https://docs.turnkey.com/api-reference/queries/list-supported-assets' },
 }
 
 function ApiCallBadge({ kind }: { kind: StepKind }) {
@@ -519,11 +539,11 @@ export default function DemoClient({ scenario, customSteps }: { scenario: Scenar
 
           {/* Request + Response panels side by side */}
           <div className="grid grid-cols-2 gap-4">
-            {isPending ? (
+            {(isPending || currentStepState.status === 'error') ? (
               <EditableRequestPanel
                 badge={<ApiCallBadge kind={scenario.steps[currentStep].kind} />}
                 value={editedRequest}
-                defaultValue={editedRequest}
+                defaultValue={JSON.stringify(stripAnnotations(preview), null, 2)}
                 parseError={requestParseError}
                 onChange={(v) => {
                   setEditedRequest(v)

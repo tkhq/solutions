@@ -368,6 +368,141 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
         organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
       }
 
+    case 'CREATE_USER_TAG':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userTagName: 'Demo User Tag',
+        userIds: [state.apiUserId ?? annotate('<apiUserId>', 'from create API user step')],
+      }
+
+    case 'CREATE_PRIVATE_KEY_TAG':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        privateKeyTagName: 'Demo Private Key Tag',
+        privateKeyIds: [state.privateKeyId ?? annotate('<privateKeyId>', 'from create private key step')],
+      }
+
+    case 'CREATE_POLICIES':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        policies: [{
+          policyName: 'Demo Policy (bulk)',
+          effect: 'EFFECT_ALLOW',
+          consensus: `approvers.any(user, user.id == '${state.apiUserId ?? annotate('<apiUserId>', 'from step 3')}')`,
+          condition: 'true',
+          notes: 'Created via Turnkey API demo',
+        }],
+      }
+
+    case 'CREATE_INVITATIONS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        invitations: [{
+          receiverUserName: 'Demo User',
+          receiverUserEmail: 'demo@example.com',
+          receiverUserTags: [],
+          accessType: annotate('ACCESS_TYPE_WEB', 'one of: ACCESS_TYPE_WEB, ACCESS_TYPE_API, ACCESS_TYPE_ALL'),
+          senderUserId: state.rootUserId ?? annotate('<rootUserId>', 'root user of the sub-org — must be the signing user'),
+        }],
+      }
+
+    case 'DELETE_PRIVATE_KEYS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        privateKeyIds: [state.privateKeyId ?? annotate('<privateKeyId>', 'from create private key step')],
+        deleteWithoutExport: true,
+      }
+
+    case 'DELETE_API_KEYS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        apiKeyIds: [state.apiKeyId ?? annotate('<apiKeyId>', 'from create API keys step')],
+      }
+
+    case 'DELETE_USER_TAGS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userTagIds: [state.userTagId ?? annotate('<userTagId>', 'from create user tag step')],
+      }
+
+    case 'DELETE_PRIVATE_KEY_TAGS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        privateKeyTagIds: [state.privateKeyTagId ?? annotate('<privateKeyTagId>', 'from create private key tag step')],
+      }
+
+    case 'DELETE_POLICIES':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        policyIds: [state.policyId ?? annotate('<policyId>', 'from create policy step')],
+      }
+
+    case 'UPDATE_ROOT_QUORUM':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        threshold: 1,
+        userIds: [state.apiUserId ?? annotate('<apiUserId>', 'from create API user step')],
+      }
+
+    case 'UPDATE_ORGANIZATION_NAME':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        organizationName: 'Demo Sub-Org (renamed)',
+      }
+
+    case 'SET_ORG_FEATURE':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        name: 'FEATURE_NAME_RATE_LIMITING',
+      }
+
+    case 'REMOVE_ORG_FEATURE':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        name: 'FEATURE_NAME_RATE_LIMITING',
+      }
+
+    case 'GET_PRIVATE_KEY':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        privateKeyId: state.privateKeyId ?? annotate('<privateKeyId>', 'from create private key step'),
+      }
+
+    case 'GET_AUTHENTICATORS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        userId: state.apiUserId ?? annotate('<apiUserId>', 'from create API user step'),
+      }
+
+    case 'GET_SUB_ORGS':
+      return {
+        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'parent org'),
+        filterType: annotate('EMAIL', 'one of: EMAIL, PHONE_NUMBER, OIDC_TOKEN, OAUTH_CLAIM'),
+        filterValue: annotate('user@example.com', 'value to filter by'),
+      }
+
+    case 'GET_VERIFIED_SUB_ORGS':
+      return {
+        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'parent org'),
+        filterType: annotate('EMAIL', 'one of: EMAIL, PHONE_NUMBER, OIDC_TOKEN, OAUTH_CLAIM'),
+        filterValue: annotate('user@example.com', 'value to filter by'),
+      }
+
+    case 'LIST_USER_TAGS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'LIST_PRIVATE_KEY_TAGS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
+    case 'LIST_SUPPORTED_ASSETS':
+      return {
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+      }
+
     default:
       return {}
   }
@@ -436,6 +571,46 @@ export async function executeStep(
       return executeGetApiKeys(step, state, ov)
     case 'GET_CONFIGS':
       return executeGetConfigs(step, state, ov)
+    case 'CREATE_USER_TAG':
+      return executeCreateUserTag(step, state, ov)
+    case 'CREATE_PRIVATE_KEY_TAG':
+      return executeCreatePrivateKeyTag(step, state, ov)
+    case 'CREATE_POLICIES':
+      return executeCreatePolicies(step, state, ov)
+    case 'CREATE_INVITATIONS':
+      return executeCreateInvitations(step, state, ov)
+    case 'DELETE_PRIVATE_KEYS':
+      return executeDeletePrivateKeys(step, state, ov)
+    case 'DELETE_API_KEYS':
+      return executeDeleteApiKeys(step, state, ov)
+    case 'DELETE_USER_TAGS':
+      return executeDeleteUserTags(step, state, ov)
+    case 'DELETE_PRIVATE_KEY_TAGS':
+      return executeDeletePrivateKeyTags(step, state, ov)
+    case 'DELETE_POLICIES':
+      return executeDeletePolicies(step, state, ov)
+    case 'UPDATE_ROOT_QUORUM':
+      return executeUpdateRootQuorum(step, state, ov)
+    case 'UPDATE_ORGANIZATION_NAME':
+      return executeUpdateOrganizationName(step, state, ov)
+    case 'SET_ORG_FEATURE':
+      return executeSetOrgFeature(step, state, ov)
+    case 'REMOVE_ORG_FEATURE':
+      return executeRemoveOrgFeature(step, state, ov)
+    case 'GET_PRIVATE_KEY':
+      return executeGetPrivateKey(step, state, ov)
+    case 'GET_AUTHENTICATORS':
+      return executeGetAuthenticators(step, state, ov)
+    case 'GET_SUB_ORGS':
+      return executeGetSubOrgs(step, state, ov)
+    case 'GET_VERIFIED_SUB_ORGS':
+      return executeGetVerifiedSubOrgs(step, state, ov)
+    case 'LIST_USER_TAGS':
+      return executeListUserTags(step, state, ov)
+    case 'LIST_PRIVATE_KEY_TAGS':
+      return executeListPrivateKeyTags(step, state, ov)
+    case 'LIST_SUPPORTED_ASSETS':
+      return executeListSupportedAssets(step, state, ov)
     default:
       throw new Error(`Unknown step kind: ${(step as StepConfig).kind}`)
   }
@@ -469,7 +644,7 @@ async function executeCreateSubOrg(step: StepConfig, state: SessionState, overri
 
   try {
     const response = await client.createSubOrganization(requestParams)
-    const updatedState = { ...state, subOrgId: response.subOrganizationId, subOrganizationName }
+    const updatedState = { ...state, subOrgId: response.subOrganizationId, subOrganizationName, rootUserId: response.rootUserIds?.[0] }
     return {
       success: true,
       request: buildDisplayRequest(step, updatedState),
@@ -905,7 +1080,8 @@ async function executeCreateApiKeys(step: StepConfig, state: SessionState, overr
   const params = (override as any) ?? defaultParams
   try {
     const response = await client.createApiKeys(params)
-    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+    const updatedState = { ...state, apiKeyId: response.apiKeyIds?.[0] }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
   } catch (error) {
     return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
   }
@@ -1097,6 +1273,321 @@ async function executeGetConfigs(step: StepConfig, state: SessionState, override
   const params = (override as any) ?? { organizationId: state.subOrgId! }
   try {
     const response = await client.getOrganizationConfigs(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreateUserTag(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    userTagName: 'Demo User Tag',
+    userIds: [state.apiUserId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createUserTag(params)
+    const updatedState = { ...state, userTagId: response.userTagId }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreatePrivateKeyTag(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    privateKeyTagName: 'Demo Private Key Tag',
+    privateKeyIds: state.privateKeyId ? [state.privateKeyId] : [],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createPrivateKeyTag(params)
+    const updatedState = { ...state, privateKeyTagId: response.privateKeyTagId }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreatePolicies(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    policies: [{
+      policyName: 'Demo Policy (bulk)',
+      effect: 'EFFECT_ALLOW' as const,
+      consensus: `approvers.any(user, user.id == '${state.apiUserId}')`,
+      condition: 'true',
+      notes: 'Created via Turnkey API demo',
+    }],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createPolicies(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeCreateInvitations(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    invitations: [{
+      receiverUserName: 'Demo User',
+      receiverUserEmail: 'demo@example.com',
+      receiverUserTags: [],
+      accessType: 'ACCESS_TYPE_WEB' as const,
+      senderUserId: state.rootUserId!,
+    }],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.createInvitations(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeletePrivateKeys(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    privateKeyIds: [state.privateKeyId!],
+    deleteWithoutExport: true,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deletePrivateKeys(params)
+    const updatedState = { ...state, privateKeyId: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeleteApiKeys(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    apiKeyIds: [state.apiKeyId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deleteApiKeys(params)
+    const updatedState = { ...state, apiKeyId: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeleteUserTags(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    userTagIds: [state.userTagId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deleteUserTags(params)
+    const updatedState = { ...state, userTagId: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeletePrivateKeyTags(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    privateKeyTagIds: [state.privateKeyTagId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deletePrivateKeyTags(params)
+    const updatedState = { ...state, privateKeyTagId: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeDeletePolicies(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    policyIds: [state.policyId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.deletePolicies(params)
+    const updatedState = { ...state, policyId: undefined }
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeUpdateRootQuorum(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    threshold: 1,
+    userIds: [state.apiUserId!],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.updateRootQuorum(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeUpdateOrganizationName(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    organizationName: 'Demo Sub-Org (renamed)',
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.updateOrganizationName(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeSetOrgFeature(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    name: 'FEATURE_NAME_RATE_LIMITING',
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.setOrganizationFeature(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeRemoveOrgFeature(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  const defaultParams = {
+    organizationId: state.subOrgId!,
+    name: 'FEATURE_NAME_RATE_LIMITING',
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? defaultParams
+  try {
+    const response = await client.removeOrganizationFeature(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetPrivateKey(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, privateKeyId: state.privateKeyId! }
+  try {
+    const response = await client.getPrivateKey(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetAuthenticators(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId!, userId: state.apiUserId! }
+  try {
+    const response = await client.getAuthenticators(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetSubOrgs(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = parentClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: process.env.ORGANIZATION_ID!, filterType: 'EMAIL', filterValue: 'user@example.com' }
+  try {
+    const response = await client.getSubOrgIds(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeGetVerifiedSubOrgs(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = parentClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: process.env.ORGANIZATION_ID!, filterType: 'EMAIL', filterValue: 'user@example.com' }
+  try {
+    const response = await client.getVerifiedSubOrgIds(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListUserTags(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.listUserTags(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListPrivateKeyTags(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.listPrivateKeyTags(params)
+    return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+  } catch (error) {
+    return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+  }
+}
+
+async function executeListSupportedAssets(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
+  const client = subOrgClient(state.subOrgId!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params = (override as any) ?? { organizationId: state.subOrgId! }
+  try {
+    const response = await client.listSupportedAssets(params)
     return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
   } catch (error) {
     return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
