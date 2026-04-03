@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { StepConfig } from '@/types/scenario'
 
 // ── Catalog definition ─────────────────────────────────────────────────────
@@ -652,6 +652,9 @@ function isAvailable(item: CatalogItem, currentSteps: CatalogItem[]): boolean {
 
 export default function BuildPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const flow = (searchParams.get('flow') ?? 'sub-org') as 'parent' | 'sub-org'
+  const flowLabel = flow === 'parent' ? 'Parent Org' : 'Sub-Org'
   const [selectedSteps, setSelectedSteps] = useState<CatalogItem[]>([])
 
   const addStep = (item: CatalogItem) => {
@@ -677,8 +680,8 @@ export default function BuildPage() {
       description: item.description,
       params: item.params,
     }))
-    sessionStorage.setItem('custom-scenario', JSON.stringify(steps))
-    router.push('/demo/custom')
+    sessionStorage.setItem(`custom-setup-${flow}`, JSON.stringify(steps))
+    router.push(`/setup/custom/${flow}`)
   }
 
   return (
@@ -698,11 +701,11 @@ export default function BuildPage() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
-          Scenarios
+          Setup
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Build Your Own Scenario</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Custom {flowLabel} Setup</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
-          Pick operations from the catalog to compose a custom API walkthrough. Steps run in order — earlier steps unlock later ones.
+          Pick operations from the catalog to compose a custom setup. Steps run in order and share session state between them.
         </p>
       </div>
 
@@ -794,7 +797,7 @@ export default function BuildPage() {
             disabled={selectedSteps.length === 0}
             className="mt-5 w-full bg-violet-600 hover:bg-violet-500 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
           >
-            {selectedSteps.length === 0 ? 'Add steps to launch' : `Launch Demo (${selectedSteps.length} steps) →`}
+            {selectedSteps.length === 0 ? 'Add steps to launch' : `Launch ${flowLabel} Setup (${selectedSteps.length} steps) →`}
           </button>
         </div>
       </div>

@@ -118,46 +118,48 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
   switch (step.kind) {
     case 'CREATE_SUB_ORG':
       return {
-        organizationId: annotate(
-          state.subOrgId ? process.env.ORGANIZATION_ID : process.env.ORGANIZATION_ID,
-          'parent org'
-        ),
-        subOrganizationName: state.subOrganizationName ?? 'Demo Sub-Org <timestamp>',
+        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'your root org — sub-orgs are always created under the parent'),
+        subOrganizationName: annotate(state.subOrganizationName ?? `my-app-user-${Date.now()}`, 'unique per end user — e.g. their user ID, email, or UUID'),
         rootUsers: [
           {
-            userName: 'Sub-Org Admin',
+            userName: annotate('Server Admin', 'label for this root user — visible in your Turnkey dashboard'),
             apiKeys: [
               {
-                apiKeyName: 'Server Admin Key',
-                publicKey: process.env.API_PUBLIC_KEY,
-                curveType: 'API_KEY_CURVE_P256',
+                apiKeyName: annotate('Server Admin Key', 'name for your server-side key — helps identify it later'),
+                publicKey: annotate(process.env.API_PUBLIC_KEY, 'your P256 public key from API_PUBLIC_KEY in .env — grants root access to this sub-org'),
+                curveType: annotate('API_KEY_CURVE_P256', 'always P256 for server API keys'),
               },
             ],
-            authenticators: [],
-            oauthProviders: [],
+            authenticators: annotate([], 'passkey authenticators — leave empty for API-key-only server access'),
+            oauthProviders: annotate([], 'OIDC/OAuth providers — add if using social login or JWTs'),
           },
         ],
-        rootQuorumThreshold: 1,
+        rootQuorumThreshold: annotate(1, '1 = single key required to approve; raise for multi-sig consensus'),
       }
 
     case 'CREATE_WALLET':
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        walletName: 'Demo Wallet',
-        accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from create sub-org step'),
+        walletName: annotate('Main Wallet', 'e.g. "Main Wallet", "Trading Wallet", "Hot Wallet"'),
+        accounts: [{
+          curve: annotate('CURVE_SECP256K1', 'CURVE_SECP256K1 for Ethereum/EVM/Bitcoin — CURVE_ED25519 for Solana/Near'),
+          pathFormat: annotate('PATH_FORMAT_BIP32', 'BIP32 for HD wallets — standard across all chains'),
+          path: annotate("m/44'/60'/0'/0/0", "BIP44 path — 60 = Ethereum cointype; increment last index for additional accounts (0, 1, 2...)"),
+          addressFormat: annotate('ADDRESS_FORMAT_ETHEREUM', 'options: ADDRESS_FORMAT_ETHEREUM, ADDRESS_FORMAT_SOLANA, ADDRESS_FORMAT_BITCOIN_MAINNET_P2WPKH, ADDRESS_FORMAT_COSMOS, etc.'),
+        }],
       }
 
     case 'CREATE_API_USER':
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from create sub-org step'),
         apiOnlyUsers: [
           {
-            userName: 'Demo API User',
-            userTags: [],
+            userName: annotate('Server API User', 'label for this user — visible in your dashboard'),
+            userTags: annotate([], 'optional — apply tag IDs from parent org setup e.g. ["<userTagId>"]'),
             apiKeys: [
               {
-                apiKeyName: 'Demo API Key',
-                publicKey: state.apiUserPublicKey ?? annotate('<generated P256 public key>', 'ephemeral, generated at runtime'),
+                apiKeyName: annotate('Server Key', 'name for this API key — helps identify it in the dashboard'),
+                publicKey: state.apiUserPublicKey ?? annotate('<generated P256 public key>', 'auto-generated P256 key — do not change, the private key is stored in session'),
               },
             ],
           },
@@ -167,13 +169,17 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
     case 'CREATE_POLICY': {
       const params = step.params as { type?: string; allowedAddress?: string }
       const { policyName, effect, condition } = getPolicyConfig(params)
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        policyName,
-        effect,
-        consensus: `approvers.any(user, user.id == '${state.apiUserId ?? annotate('<apiUserId>', 'from step 3')}')`,
-        condition,
-        notes: 'Created via Turnkey API demo',
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        policyName: annotate(policyName, 'name this clearly — it appears in your Turnkey dashboard'),
+        effect: annotate(effect, 'EFFECT_ALLOW to permit the action, EFFECT_DENY to block it'),
+        consensus: annotate(
+          `approvers.any(user, user.id == '${state.apiUserId ?? '<apiUserId>'}')`,
+          'who must approve — supports user.id, user.tags, user.groups; use "true" to auto-approve'
+        ),
+        condition: annotate(condition, 'when this policy applies — "true" = always; or restrict by activity type, chain, address, etc.'),
+        notes: annotate('Allow all signing activity', 'describe what this policy does — for your own reference'),
       }
     }
 
@@ -212,7 +218,7 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
 
     case 'GET_WHO_AM_I':
       return {
-        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'parent org'),
+        organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'your root organization ID — from ORGANIZATION_ID in your .env'),
       }
 
     case 'LIST_WALLETS':
@@ -368,19 +374,23 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
         organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
       }
 
-    case 'CREATE_USER_TAG':
+    case 'CREATE_USER_TAG': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        userTagName: 'Demo User Tag',
-        userIds: [state.apiUserId ?? annotate('<apiUserId>', 'from create API user step')],
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        userTagName: annotate('end-user', 'e.g. "end-user", "admin", "trader", "read-only" — tag names appear in policy expressions'),
+        userIds: annotate([], 'optional — assign existing users to this tag now, or leave empty and apply later'),
       }
+    }
 
-    case 'CREATE_PRIVATE_KEY_TAG':
+    case 'CREATE_PRIVATE_KEY_TAG': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        privateKeyTagName: 'Demo Private Key Tag',
-        privateKeyIds: [state.privateKeyId ?? annotate('<privateKeyId>', 'from create private key step')],
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        privateKeyTagName: annotate('hot-wallet', 'e.g. "hot-wallet", "cold-storage", "trading", "custody" — used in policy conditions'),
+        privateKeyIds: annotate([], 'optional — tag existing private keys now, or leave empty and apply later'),
       }
+    }
 
     case 'CREATE_POLICIES':
       return {
@@ -444,23 +454,29 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
         userIds: [state.apiUserId ?? annotate('<apiUserId>', 'from create API user step')],
       }
 
-    case 'UPDATE_ORGANIZATION_NAME':
+    case 'UPDATE_ORGANIZATION_NAME': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        organizationName: 'Demo Sub-Org (renamed)',
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        organizationName: annotate('My App Wallets', 'e.g. "Acme Wallets", "Trading Desk", "My DeFi App" — visible in your dashboard'),
       }
+    }
 
-    case 'SET_ORG_FEATURE':
+    case 'SET_ORG_FEATURE': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        name: 'FEATURE_NAME_RATE_LIMITING',
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        name: annotate('FEATURE_NAME_RATE_LIMITING', 'options: FEATURE_NAME_RATE_LIMITING, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH'),
       }
+    }
 
-    case 'REMOVE_ORG_FEATURE':
+    case 'REMOVE_ORG_FEATURE': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
-        name: 'FEATURE_NAME_RATE_LIMITING',
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
+        name: annotate('FEATURE_NAME_RATE_LIMITING', 'options: FEATURE_NAME_RATE_LIMITING, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH'),
       }
+    }
 
     case 'GET_PRIVATE_KEY':
       return {
@@ -760,17 +776,18 @@ async function executeCreatePolicy(
   params: { type?: string; allowedAddress?: string },
   override?: Record<string, unknown>
 ): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const { policyName, effect, condition } = getPolicyConfig(params)
   const { allowedAddress } = params
 
   const defaultParams = {
-    organizationId: state.subOrgId!,
+    organizationId: orgId,
     policyName,
     effect: effect as 'EFFECT_ALLOW' | 'EFFECT_DENY',
-    consensus: `approvers.any(user, user.id == '${state.apiUserId}')`,
+    consensus: `approvers.any(user, user.id == '${state.apiUserId ?? ''}')`,
     condition,
-    notes: 'Created via Turnkey API demo',
+    notes: 'Allow all signing activity',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestParams = (override as any) ?? defaultParams
@@ -1280,11 +1297,12 @@ async function executeGetConfigs(step: StepConfig, state: SessionState, override
 }
 
 async function executeCreateUserTag(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
-    userTagName: 'Demo User Tag',
-    userIds: [state.apiUserId!],
+    organizationId: orgId,
+    userTagName: 'end-user',
+    userIds: [],
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params = (override as any) ?? defaultParams
@@ -1298,11 +1316,12 @@ async function executeCreateUserTag(step: StepConfig, state: SessionState, overr
 }
 
 async function executeCreatePrivateKeyTag(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
-    privateKeyTagName: 'Demo Private Key Tag',
-    privateKeyIds: state.privateKeyId ? [state.privateKeyId] : [],
+    organizationId: orgId,
+    privateKeyTagName: 'hot-wallet',
+    privateKeyIds: [],
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params = (override as any) ?? defaultParams
@@ -1463,10 +1482,11 @@ async function executeUpdateRootQuorum(step: StepConfig, state: SessionState, ov
 }
 
 async function executeUpdateOrganizationName(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
-    organizationName: 'Demo Sub-Org (renamed)',
+    organizationId: orgId,
+    organizationName: 'My App Wallets',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params = (override as any) ?? defaultParams
@@ -1479,9 +1499,10 @@ async function executeUpdateOrganizationName(step: StepConfig, state: SessionSta
 }
 
 async function executeSetOrgFeature(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
+    organizationId: orgId,
     name: 'FEATURE_NAME_RATE_LIMITING',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1495,9 +1516,10 @@ async function executeSetOrgFeature(step: StepConfig, state: SessionState, overr
 }
 
 async function executeRemoveOrgFeature(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
+    organizationId: orgId,
     name: 'FEATURE_NAME_RATE_LIMITING',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
