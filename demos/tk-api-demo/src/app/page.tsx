@@ -16,6 +16,19 @@ export default function Home() {
         </p>
       </div>
 
+      <Link href="/setup/recommend" className="block border border-violet-200 dark:border-violet-800/60 bg-violet-50 dark:bg-violet-900/20 rounded-xl p-6 hover:border-violet-400 dark:hover:border-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all group mb-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">Not sure where to start?</span>
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors">Get a Recommended Setup</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Answer 4 quick questions about your app and we&apos;ll suggest the right parent org and sub-org configuration.</p>
+          </div>
+          <span className="text-violet-400 dark:text-violet-500 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors text-lg leading-none shrink-0 mt-1">→</span>
+        </div>
+      </Link>
+
       <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Guided Setup</p>
       <div className="space-y-4">
         {/* Parent Org */}
