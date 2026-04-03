@@ -7,6 +7,8 @@ export const parentOrgSteps: StepConfig[] = [
   { kind: 'CREATE_USER_TAG', title: 'Create User Tag', description: 'Create a tag to classify users in your sub-orgs (e.g. "end-user", "admin").' },
   { kind: 'CREATE_PRIVATE_KEY_TAG', title: 'Create Private Key Tag', description: 'Create a tag to classify private keys (e.g. "hot-wallet", "cold-storage").' },
   { kind: 'CREATE_POLICY', title: 'Create Org Policy', description: 'Create a top-level policy governing signing permissions across your organization.', params: { type: 'permissive' } },
+  { kind: 'CREATE_INVITATIONS', title: 'Invite Team Members', description: 'Send invitations to team members who need access to this organization.' },
+  { kind: 'UPDATE_ROOT_QUORUM', title: 'Update Root Quorum', description: 'Optionally require multiple approvers for root-level actions, adding a layer of security against single points of failure.' },
 ]
 
 export const subOrgSteps: StepConfig[] = [

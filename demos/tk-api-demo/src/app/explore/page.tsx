@@ -759,6 +759,17 @@ export default function ExplorePage() {
               Updated {formatDate(lastUpdated)}
             </span>
           )}
+          <a
+            href="https://app.turnkey.com/dashboard/auth/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 border border-violet-200 dark:border-violet-800/60 hover:border-violet-400 dark:hover:border-violet-600 px-3 py-1.5 rounded-lg transition-all"
+          >
+            Turnkey Dashboard
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+            </svg>
+          </a>
           <button
             onClick={fetchData}
             disabled={loading}

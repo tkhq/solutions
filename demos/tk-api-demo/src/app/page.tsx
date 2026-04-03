@@ -83,8 +83,18 @@ export default function Home() {
         </Link>
       </div>
 
-      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-10 mb-3">Visualize</p>
-      <Link href="/explore" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group mb-10">
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-10 mb-3">Run &amp; Explore</p>
+      <div className="space-y-4 mb-10">
+      <Link href="/interact" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors">Interact</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Select an existing sub-org or parent org and run a custom scenario of activities and queries against it.</p>
+          </div>
+          <span className="text-gray-400 dark:text-gray-600 group-hover:text-violet-500 dark:group-hover:text-violet-400 transition-colors text-lg leading-none shrink-0 mt-1">→</span>
+        </div>
+      </Link>
+      <Link href="/explore" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors">Org Explorer</h2>
@@ -93,6 +103,7 @@ export default function Home() {
           <span className="text-gray-400 dark:text-gray-600 group-hover:text-violet-500 dark:group-hover:text-violet-400 transition-colors text-lg leading-none shrink-0 mt-1">→</span>
         </div>
       </Link>
+      </div>
 
       <div className="mt-4 pt-8 border-t border-gray-100 dark:border-gray-900 flex justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}

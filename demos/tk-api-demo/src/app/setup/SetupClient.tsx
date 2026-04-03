@@ -311,10 +311,12 @@ export default function SetupClient({
   steps,
   flowId,
   initialSessionState,
+  ignorePersistedSession,
 }: {
   steps: StepConfig[]
   flowId: 'parent' | 'sub-org'
   initialSessionState?: SessionState
+  ignorePersistedSession?: boolean
 }) {
   const scenarioId = 'custom'
   const flowName = flowId === 'parent' ? 'Parent Org Setup' : 'Sub-Org Setup'
@@ -344,38 +346,40 @@ export default function SetupClient({
 
   // On mount: restore persisted session or merge parent state
   useEffect(() => {
-    const sessionKey = flowSessionKey(flowId)
-    const saved = localStorage.getItem(sessionKey)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as {
-          sessionState: SessionState
-          stepStates: StepState[]
-          currentStep: number
-        }
-        setSessionState(parsed.sessionState ?? {})
-        // Guard against stale saves with a different step count
-        if (parsed.stepStates?.length === steps.length) {
-          setStepStates(parsed.stepStates)
-          setCurrentStep(parsed.currentStep ?? 0)
-        }
-        setHasParentState(!!localStorage.getItem(PARENT_STATE_KEY))
-        return
-      } catch {
-        // ignore corrupt data
-      }
-    }
-
-    // No saved session — check parent state
-    const parentStored = localStorage.getItem(PARENT_STATE_KEY)
-    if (parentStored) {
-      setHasParentState(true)
-      if (flowId === 'sub-org') {
+    if (!ignorePersistedSession) {
+      const sessionKey = flowSessionKey(flowId)
+      const saved = localStorage.getItem(sessionKey)
+      if (saved) {
         try {
-          const parsed = JSON.parse(parentStored) as SessionState
-          setSessionState((prev) => ({ ...parsed, ...prev }))
+          const parsed = JSON.parse(saved) as {
+            sessionState: SessionState
+            stepStates: StepState[]
+            currentStep: number
+          }
+          setSessionState(parsed.sessionState ?? {})
+          // Guard against stale saves with a different step count
+          if (parsed.stepStates?.length === steps.length) {
+            setStepStates(parsed.stepStates)
+            setCurrentStep(parsed.currentStep ?? 0)
+          }
+          setHasParentState(!!localStorage.getItem(PARENT_STATE_KEY))
+          return
         } catch {
-          // ignore
+          // ignore corrupt data
+        }
+      }
+
+      // No saved session — check parent state
+      const parentStored = localStorage.getItem(PARENT_STATE_KEY)
+      if (parentStored) {
+        setHasParentState(true)
+        if (flowId === 'sub-org') {
+          try {
+            const parsed = JSON.parse(parentStored) as SessionState
+            setSessionState((prev) => ({ ...parsed, ...prev }))
+          } catch {
+            // ignore
+          }
         }
       }
     }
@@ -819,6 +823,17 @@ export default function SetupClient({
                     <span className="text-emerald-600 dark:text-emerald-400 font-medium text-sm">
                       Setup complete
                     </span>
+                    <a
+                      href="https://app.turnkey.com/dashboard/auth/login"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 border border-violet-200 dark:border-violet-800/60 hover:border-violet-400 dark:hover:border-violet-600 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/30 px-4 py-2 rounded-lg transition-all font-medium"
+                    >
+                      View in Turnkey Dashboard
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
                     <button
                       onClick={reset}
                       className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 px-4 py-2 rounded-lg transition-all"

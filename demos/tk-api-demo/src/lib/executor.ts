@@ -137,9 +137,10 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
         rootQuorumThreshold: annotate(1, '1 = single key required to approve; raise for multi-sig consensus'),
       }
 
-    case 'CREATE_WALLET':
+    case 'CREATE_WALLET': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from create sub-org step'),
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
         walletName: annotate('Main Wallet', 'e.g. "Main Wallet", "Trading Wallet", "Hot Wallet"'),
         accounts: [{
           curve: annotate('CURVE_SECP256K1', 'CURVE_SECP256K1 for Ethereum/EVM/Bitcoin — CURVE_ED25519 for Solana/Near'),
@@ -148,6 +149,7 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
           addressFormat: annotate('ADDRESS_FORMAT_ETHEREUM', 'options: ADDRESS_FORMAT_ETHEREUM, ADDRESS_FORMAT_SOLANA, ADDRESS_FORMAT_BITCOIN_MAINNET_P2WPKH, ADDRESS_FORMAT_COSMOS, etc.'),
         }],
       }
+    }
 
     case 'CREATE_API_USER':
       return {
@@ -404,17 +406,19 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
         }],
       }
 
-    case 'CREATE_INVITATIONS':
+    case 'CREATE_INVITATIONS': {
+      const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
-        organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+        organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
         invitations: [{
-          receiverUserName: 'Demo User',
-          receiverUserEmail: 'demo@example.com',
-          receiverUserTags: [],
+          receiverUserName: annotate('New Team Member', 'display name for the invited user'),
+          receiverUserEmail: annotate('teammate@yourcompany.com', 'email for the invitation — tip: use aliases like teammate+dev@yourcompany.com or teammate+prod@yourcompany.com to reuse the same email across environments'),
+          receiverUserTags: annotate([], 'optional — apply tag IDs to control permissions e.g. ["<userTagId>"]'),
           accessType: annotate('ACCESS_TYPE_WEB', 'one of: ACCESS_TYPE_WEB, ACCESS_TYPE_API, ACCESS_TYPE_ALL'),
-          senderUserId: state.rootUserId ?? annotate('<rootUserId>', 'root user of the sub-org — must be the signing user'),
+          senderUserId: state.rootUserId ?? annotate('<rootUserId>', 'root user ID — captured automatically from Verify Credentials step'),
         }],
       }
+    }
 
     case 'DELETE_PRIVATE_KEYS':
       return {
@@ -678,10 +682,11 @@ async function executeCreateSubOrg(step: StepConfig, state: SessionState, overri
 }
 
 async function executeCreateWallet(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
 
   const defaultParams = {
-    organizationId: state.subOrgId!,
+    organizationId: orgId,
     walletName: 'Demo Wallet',
     accounts: DEFAULT_ETHEREUM_ACCOUNTS,
   }
@@ -914,11 +919,16 @@ async function executeGetWhoAmI(step: StepConfig, state: SessionState, override?
   const params = (override as any) ?? { organizationId: process.env.ORGANIZATION_ID! }
   try {
     const response = await client.getWhoami(params)
+    // Capture the root user ID for use in downstream steps (e.g. CREATE_INVITATIONS)
+    const updatedState: SessionState = {
+      ...state,
+      rootUserId: state.rootUserId ?? response.userId,
+    }
     return {
       success: true,
       request: buildDisplayRequest(step, state),
       response: trimResponse(response),
-      updatedState: state,
+      updatedState,
     }
   } catch (error) {
     return {
@@ -1357,9 +1367,10 @@ async function executeCreatePolicies(step: StepConfig, state: SessionState, over
 }
 
 async function executeCreateInvitations(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
-  const client = subOrgClient(state.subOrgId!)
+  const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID!
+  const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
-    organizationId: state.subOrgId!,
+    organizationId: orgId,
     invitations: [{
       receiverUserName: 'Demo User',
       receiverUserEmail: 'demo@example.com',
