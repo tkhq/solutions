@@ -466,7 +466,7 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
       const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
         organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
-        name: annotate('FEATURE_NAME_RATE_LIMITING', 'options: FEATURE_NAME_RATE_LIMITING, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH'),
+        name: annotate('FEATURE_NAME_EMAIL_AUTH', 'options: FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_WEBHOOK, FEATURE_NAME_SMS_AUTH, FEATURE_NAME_AUTH_PROXY, FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED'),
       }
     }
 
@@ -474,7 +474,7 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
       const orgId = state.subOrgId ?? process.env.ORGANIZATION_ID
       return {
         organizationId: annotate(orgId ?? '<organizationId>', state.subOrgId ? 'sub-org ID' : 'your root organization ID'),
-        name: annotate('FEATURE_NAME_RATE_LIMITING', 'options: FEATURE_NAME_RATE_LIMITING, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH'),
+        name: annotate('FEATURE_NAME_EMAIL_AUTH', 'options: FEATURE_NAME_EMAIL_AUTH, FEATURE_NAME_EMAIL_RECOVERY, FEATURE_NAME_OTP_EMAIL_AUTH, FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY, FEATURE_NAME_WEBAUTHN_ORIGINS, FEATURE_NAME_WEBHOOK, FEATURE_NAME_SMS_AUTH, FEATURE_NAME_AUTH_PROXY, FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED'),
       }
     }
 
@@ -1503,7 +1503,7 @@ async function executeSetOrgFeature(step: StepConfig, state: SessionState, overr
   const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
     organizationId: orgId,
-    name: 'FEATURE_NAME_RATE_LIMITING',
+    name: 'FEATURE_NAME_EMAIL_AUTH',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params = (override as any) ?? defaultParams
@@ -1520,7 +1520,7 @@ async function executeRemoveOrgFeature(step: StepConfig, state: SessionState, ov
   const client = state.subOrgId ? subOrgClient(state.subOrgId) : parentClient()
   const defaultParams = {
     organizationId: orgId,
-    name: 'FEATURE_NAME_RATE_LIMITING',
+    name: 'FEATURE_NAME_EMAIL_AUTH',
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params = (override as any) ?? defaultParams

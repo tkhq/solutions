@@ -83,7 +83,18 @@ export default function Home() {
         </Link>
       </div>
 
-      <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-900 flex justify-center">
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-10 mb-3">Visualize</p>
+      <Link href="/explore" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group mb-10">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors">Org Explorer</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Visualize your parent org and sub-org hierarchy, see all wallets, users, and how policies apply across your org tree.</p>
+          </div>
+          <span className="text-gray-400 dark:text-gray-600 group-hover:text-violet-500 dark:group-hover:text-violet-400 transition-colors text-lg leading-none shrink-0 mt-1">→</span>
+        </div>
+      </Link>
+
+      <div className="mt-4 pt-8 border-t border-gray-100 dark:border-gray-900 flex justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/secured-by-black.svg" alt="Secured by Turnkey" height={18} className="dark:hidden opacity-40" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
