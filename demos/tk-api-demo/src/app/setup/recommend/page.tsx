@@ -379,7 +379,7 @@ export default function RecommendPage() {
           {/* Two columns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Parent org */}
-            <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-5 flex flex-col">
               <div className="flex items-center gap-2 mb-4">
                 <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Parent Org Setup</h2>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2 py-0.5 rounded-full">
@@ -387,7 +387,7 @@ export default function RecommendPage() {
                 </span>
               </div>
 
-              <ol className="space-y-3 mb-5">
+              <ol className="space-y-3 mb-5 flex-1">
                 {recommendation.parentSteps.map((step, i) => (
                   <li key={`${step.kind}-${i}`} className="flex gap-3">
                     <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center mt-0.5">
@@ -410,7 +410,7 @@ export default function RecommendPage() {
             </div>
 
             {/* Sub-org */}
-            <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-5 flex flex-col">
               <div className="flex items-center gap-2 mb-4">
                 <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Sub-Org Setup</h2>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2 py-0.5 rounded-full">
@@ -418,7 +418,7 @@ export default function RecommendPage() {
                 </span>
               </div>
 
-              <ol className="space-y-3 mb-5">
+              <ol className="space-y-3 mb-5 flex-1">
                 {recommendation.subOrgSteps.map((step, i) => (
                   <li key={`${step.kind}-${i}`} className="flex gap-3">
                     <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center mt-0.5">

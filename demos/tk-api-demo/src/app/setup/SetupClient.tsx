@@ -1,11 +1,52 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type { SessionState, StepResult, StepKind, StepConfig } from '@/types/scenario'
 import { SDK_METHODS } from '@/lib/setup-flows'
 
 const PARENT_STATE_KEY = 'tk-parent-org-state'
+const flowSessionKey = (flowId: string) => `tk-session-${flowId}`
+
+const DESTRUCTIVE_KINDS = new Set<StepKind>([
+  'UPDATE_ROOT_QUORUM',
+  'DELETE_POLICY', 'DELETE_POLICIES',
+  'DELETE_WALLETS',
+  'DELETE_USERS',
+  'DELETE_PRIVATE_KEYS',
+  'DELETE_API_KEYS',
+  'DELETE_USER_TAGS',
+  'DELETE_PRIVATE_KEY_TAGS',
+])
+
+// Fields each step kind produces in SessionState
+const STEP_PRODUCES: Partial<Record<StepKind, (keyof SessionState)[]>> = {
+  CREATE_SUB_ORG:         ['subOrgId', 'rootUserId'],
+  CREATE_WALLET:          ['walletId', 'walletAddress'],
+  CREATE_POLICY:          ['policyId'],
+  CREATE_API_USER:        ['apiUserId', 'apiUserPublicKey', 'apiUserPrivateKey'],
+  CREATE_USER_TAG:        ['userTagId'],
+  CREATE_PRIVATE_KEY_TAG: ['privateKeyTagId'],
+  CREATE_API_KEYS:        ['apiKeyId'],
+  CREATE_PRIVATE_KEY:     ['privateKeyId'],
+}
+
+const SESSION_STATE_LABELS: Record<keyof SessionState, string> = {
+  subOrgId:             'Sub-Org ID',
+  subOrganizationName:  'Sub-Org Name',
+  walletId:             'Wallet ID',
+  walletAddress:        'Wallet Address',
+  apiUserId:            'API User ID',
+  apiUserPublicKey:     'API User Public Key',
+  apiUserPrivateKey:    'API User Private Key',
+  policyId:             'Policy ID',
+  allowedAddress:       'Allowed Address',
+  privateKeyId:         'Private Key ID',
+  userTagId:            'User Tag ID',
+  privateKeyTagId:      'Private Key Tag ID',
+  apiKeyId:             'API Key ID',
+  rootUserId:           'Root User ID',
+}
 
 const API_CALLS: Record<StepKind, { name: string; docs: string }> = {
   // Activities
@@ -230,60 +271,31 @@ function JsonPanel({ label, badge, data, error, muted }: { label: React.ReactNod
   )
 }
 
-function EditableRequestPanel({
-  badge,
-  value,
-  defaultValue,
-  parseError,
-  onChange,
-  onReset,
-}: {
-  badge?: React.ReactNode
-  value: string
-  defaultValue: string
-  parseError: string | null
-  onChange: (v: string) => void
-  onReset: () => void
-}) {
-  const isModified = value !== defaultValue
+function SessionStateField({ name, value }: { name: keyof SessionState; value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
-    <div className={`rounded-xl border transition-colors ${parseError ? 'border-red-400 dark:border-red-600' : 'border-violet-300 dark:border-violet-700'}`}>
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700/60">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">Request</span>
-          {isModified && (
-            <span className="text-[10px] px-1.5 py-px rounded bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 font-medium">
-              edited
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {badge}
-          {isModified && (
-            <button
-              onClick={onReset}
-              className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              Reset
-            </button>
-          )}
-        </div>
+    <div className="px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+      <div className="flex items-center justify-between gap-1 mb-0.5">
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium truncate">
+          {SESSION_STATE_LABELS[name] ?? name}
+        </span>
+        <button
+          onClick={copy}
+          className="text-[10px] text-gray-400 dark:text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors shrink-0"
+        >
+          {copied ? '✓' : 'copy'}
+        </button>
       </div>
-      <div className="relative">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          spellCheck={false}
-          className="w-full p-4 text-xs font-mono leading-relaxed bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 resize-none focus:outline-none min-h-48 overflow-x-auto whitespace-pre"
-          style={{ height: `${Math.max(192, (value.split('\n').length + 1) * 18)}px` }}
-        />
-        {parseError && (
-          <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-400">
-            {parseError}
-          </div>
-        )}
-      </div>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 break-all leading-snug">
+        {value}
+      </p>
     </div>
   )
 }
@@ -320,14 +332,47 @@ export default function SetupClient({
   const [hasParentState, setHasParentState] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
 
-  // On mount: for sub-org flow, merge parent state; check if parent state exists
+  // New state for the 5 improvements
+  const [stateInspectorOpen, setStateInspectorOpen] = useState(false)
+  const [confirmingDestructive, setConfirmingDestructive] = useState(false)
+  const [skipOpen, setSkipOpen] = useState(false)
+  const [skipValues, setSkipValues] = useState<Record<string, string>>({})
+
+  // Ref to always have latest stepStates in effects without re-triggering them
+  const stepStatesRef = useRef(stepStates)
+  useEffect(() => { stepStatesRef.current = stepStates }, [stepStates])
+
+  // On mount: restore persisted session or merge parent state
   useEffect(() => {
-    const stored = localStorage.getItem(PARENT_STATE_KEY)
-    if (stored) {
+    const sessionKey = flowSessionKey(flowId)
+    const saved = localStorage.getItem(sessionKey)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as {
+          sessionState: SessionState
+          stepStates: StepState[]
+          currentStep: number
+        }
+        setSessionState(parsed.sessionState ?? {})
+        // Guard against stale saves with a different step count
+        if (parsed.stepStates?.length === steps.length) {
+          setStepStates(parsed.stepStates)
+          setCurrentStep(parsed.currentStep ?? 0)
+        }
+        setHasParentState(!!localStorage.getItem(PARENT_STATE_KEY))
+        return
+      } catch {
+        // ignore corrupt data
+      }
+    }
+
+    // No saved session — check parent state
+    const parentStored = localStorage.getItem(PARENT_STATE_KEY)
+    if (parentStored) {
       setHasParentState(true)
       if (flowId === 'sub-org') {
         try {
-          const parsed = JSON.parse(stored) as SessionState
+          const parsed = JSON.parse(parentStored) as SessionState
           setSessionState((prev) => ({ ...parsed, ...prev }))
         } catch {
           // ignore
@@ -338,13 +383,30 @@ export default function SetupClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fetch the request preview whenever we land on a new pending step
+  // Fetch the request preview whenever we land on a new step
   useEffect(() => {
     setPreview(null)
     setEditedRequest('')
     setRequestParseError(null)
     setRequestTab('request')
     setEditMode(false)
+    setConfirmingDestructive(false)
+    setSkipOpen(false)
+    setSkipValues({})
+
+    // Step replay: if this step is already done, populate from stored result
+    const existing = stepStatesRef.current[currentStep]
+    if (existing?.status === 'success' || existing?.status === 'expected-failure') {
+      if (existing.result) {
+        setPreview(existing.result.request)
+        const req = existing.result.request
+        if (req !== null && req !== undefined) {
+          setEditedRequest(JSON.stringify(req, null, 2))
+        }
+      }
+      return
+    }
+
     fetch('/api/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -369,6 +431,10 @@ export default function SetupClient({
     setRequestParseError(null)
     setRequestTab('request')
     setEditMode(false)
+    setConfirmingDestructive(false)
+    setSkipOpen(false)
+    setSkipValues({})
+    localStorage.removeItem(flowSessionKey(flowId))
     if (flowId === 'parent') {
       localStorage.removeItem(PARENT_STATE_KEY)
       setHasParentState(false)
@@ -406,15 +472,24 @@ export default function SetupClient({
 
       setSessionState(result.updatedState)
 
-      // Persist state after each step
+      const updatedStepStates = stepStates.map((s, i) =>
+        i === currentStep ? { status, result } : s
+      )
+
+      // Persist parent-to-sub-org handoff state
       if (flowId === 'parent') {
         localStorage.setItem(PARENT_STATE_KEY, JSON.stringify(result.updatedState))
         setHasParentState(true)
       }
 
-      setStepStates((prev) =>
-        prev.map((s, i) => (i === currentStep ? { status, result } : s))
-      )
+      // Persist full session state for refresh recovery
+      localStorage.setItem(flowSessionKey(flowId), JSON.stringify({
+        sessionState: result.updatedState,
+        stepStates: updatedStepStates,
+        currentStep,
+      }))
+
+      setStepStates(updatedStepStates)
     } catch (err) {
       setStepStates((prev) =>
         prev.map((s, i) =>
@@ -433,7 +508,39 @@ export default function SetupClient({
         )
       )
     }
-  }, [currentStep, editedRequest, sessionState, steps, flowId])
+  }, [currentStep, editedRequest, sessionState, steps, stepStates, flowId])
+
+  const applySkip = useCallback(() => {
+    const produces = STEP_PRODUCES[steps[currentStep].kind] ?? []
+    const patch: SessionState = {}
+    for (const field of produces) {
+      const v = (skipValues[field] ?? '').trim()
+      if (v) (patch as Record<string, string>)[field] = v
+    }
+    const updatedState: SessionState = { ...sessionState, ...patch }
+    const skippedResult: StepResult = {
+      success: true,
+      request: null,
+      response: { note: 'Step skipped — IDs provided manually', ...patch },
+      updatedState,
+    }
+    setSessionState(updatedState)
+    const updatedStepStates = stepStates.map((s, i) =>
+      i === currentStep ? { status: 'success' as StepStatus, result: skippedResult } : s
+    )
+    localStorage.setItem(flowSessionKey(flowId), JSON.stringify({
+      sessionState: updatedState,
+      stepStates: updatedStepStates,
+      currentStep,
+    }))
+    if (flowId === 'parent') {
+      localStorage.setItem(PARENT_STATE_KEY, JSON.stringify(updatedState))
+      setHasParentState(true)
+    }
+    setStepStates(updatedStepStates)
+    setSkipOpen(false)
+    setSkipValues({})
+  }, [currentStep, sessionState, skipValues, steps, stepStates, flowId])
 
   const currentStepState = stepStates[currentStep]
   const canAdvance =
@@ -441,6 +548,8 @@ export default function SetupClient({
   const isLastStep = currentStep === steps.length - 1
   const isPending = currentStepState.status === 'pending'
   const isRunning = currentStepState.status === 'running'
+  const isDestructive = DESTRUCTIVE_KINDS.has(steps[currentStep].kind)
+  const stepProduces = STEP_PRODUCES[steps[currentStep].kind] ?? []
 
   const badge = <ApiCallBadge kind={steps[currentStep].kind} />
 
@@ -450,11 +559,16 @@ export default function SetupClient({
     setTimeout(() => setCodeCopied(false), 1500)
   }
 
+  // Non-null session state entries for the inspector
+  const sessionEntries = Object.entries(sessionState).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ''
+  ) as [keyof SessionState, string][]
+
   return (
     <div className="flex min-h-screen">
       {/* Left sidebar — step list */}
       <aside className="w-64 shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-        <div className="sticky top-0 flex flex-col gap-1 p-4 pt-6">
+        <div className="sticky top-0 flex flex-col gap-1 p-4 pt-6 max-h-screen overflow-y-auto">
           <div className="flex items-center gap-2 mb-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/logo-black.svg" alt="Turnkey" height={18} className="dark:hidden" />
@@ -508,6 +622,26 @@ export default function SetupClient({
               </button>
             )
           })}
+
+          {/* Session state inspector */}
+          {sessionEntries.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-3">
+              <button
+                onClick={() => setStateInspectorOpen((o) => !o)}
+                className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                <span>Session State ({sessionEntries.length})</span>
+                <span className="text-[10px]">{stateInspectorOpen ? '▾' : '▸'}</span>
+              </button>
+              {stateInspectorOpen && (
+                <div className="mt-2 space-y-1.5">
+                  {sessionEntries.map(([k, v]) => (
+                    <SessionStateField key={k} name={k} value={v} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 
@@ -547,6 +681,14 @@ export default function SetupClient({
                   Signing Approved
                 </span>
               )}
+              {currentStepState.result?.response != null &&
+                typeof currentStepState.result.response === 'object' &&
+                'note' in (currentStepState.result.response as object) &&
+                (currentStepState.result.response as Record<string, unknown>).note === 'Step skipped — IDs provided manually' && (
+                <span className="text-xs bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full">
+                  Skipped
+                </span>
+              )}
             </div>
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
               {steps[currentStep].title}
@@ -557,15 +699,103 @@ export default function SetupClient({
           </div>
 
           {/* Action row */}
-          <div className="mb-5">
-            {isPending && (
-              <button
-                onClick={runStep}
-                className="bg-violet-600 hover:bg-violet-500 text-white font-medium px-5 py-2 rounded-lg text-sm transition-colors"
-              >
-                Execute Step
-              </button>
+          <div className="mb-5 space-y-3">
+            {/* Destructive warning */}
+            {isPending && confirmingDestructive && (
+              <div className="rounded-xl border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-900/20 p-4 max-w-lg">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">
+                  Destructive operation
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-500 mb-3 leading-relaxed">
+                  This action cannot easily be undone. Make sure you have the right IDs before continuing.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setConfirmingDestructive(false); runStep() }}
+                    className="bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
+                  >
+                    Confirm & Execute
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDestructive(false)}
+                    className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
+
+            {/* Skip form */}
+            {isPending && skipOpen && (
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4 max-w-lg">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Mark as complete with existing IDs
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                  Enter the IDs that already exist for this step. They will be carried forward into subsequent steps.
+                </p>
+                {stepProduces.length > 0 ? (
+                  <div className="space-y-2 mb-3">
+                    {stepProduces.map((field) => (
+                      <div key={field}>
+                        <label className="block text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
+                          {SESSION_STATE_LABELS[field] ?? field}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={`Enter ${SESSION_STATE_LABELS[field] ?? field}`}
+                          value={skipValues[field] ?? ''}
+                          onChange={(e) => setSkipValues((p) => ({ ...p, [field]: e.target.value }))}
+                          className="w-full px-3 py-1.5 text-xs font-mono bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:border-violet-400 dark:focus:border-violet-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 italic">
+                    This step doesn't produce tracked IDs — it will be marked done without changes to session state.
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={applySkip}
+                    className="bg-gray-800 dark:bg-gray-200 hover:bg-gray-700 dark:hover:bg-white text-white dark:text-gray-900 font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
+                  >
+                    Apply & Continue
+                  </button>
+                  <button
+                    onClick={() => { setSkipOpen(false); setSkipValues({}) }}
+                    className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Main action buttons */}
+            {isPending && !confirmingDestructive && !skipOpen && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => isDestructive ? setConfirmingDestructive(true) : runStep()}
+                  className={`font-medium px-5 py-2 rounded-lg text-sm transition-colors ${
+                    isDestructive
+                      ? 'bg-red-600 hover:bg-red-500 text-white'
+                      : 'bg-violet-600 hover:bg-violet-500 text-white'
+                  }`}
+                >
+                  Execute Step
+                </button>
+                <button
+                  onClick={() => setSkipOpen(true)}
+                  className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 px-4 py-2 rounded-lg transition-all"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
+
             {isRunning && (
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <svg className="animate-spin w-4 h-4 text-violet-500 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
