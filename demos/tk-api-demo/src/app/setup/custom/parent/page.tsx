@@ -8,6 +8,7 @@ import type { StepConfig } from '@/types/scenario'
 export default function CustomParentSetupPage() {
   const router = useRouter()
   const [steps, setSteps] = useState<StepConfig[] | null>(null)
+  const [hasSubOrgContinuation, setHasSubOrgContinuation] = useState(false)
 
   useEffect(() => {
     const raw = sessionStorage.getItem('custom-setup-parent')
@@ -19,6 +20,15 @@ export default function CustomParentSetupPage() {
       setSteps(JSON.parse(raw) as StepConfig[])
     } catch {
       router.replace('/build?flow=parent')
+      return
+    }
+
+    // If launched from the recommender with sub-org steps, copy them into the
+    // sub-org slot so SetupClient can offer a direct "Continue →" handoff.
+    const subOrgRaw = sessionStorage.getItem('tk-recommend-suborg')
+    if (subOrgRaw) {
+      sessionStorage.setItem('custom-setup-sub-org', subOrgRaw)
+      setHasSubOrgContinuation(true)
     }
   }, [router])
 
@@ -30,5 +40,12 @@ export default function CustomParentSetupPage() {
     )
   }
 
-  return <SetupClient steps={steps} flowId="parent" />
+  return (
+    <SetupClient
+      steps={steps}
+      flowId="parent"
+      nextFlowHref={hasSubOrgContinuation ? '/setup/custom/sub-org' : undefined}
+      nextFlowLabel="Continue to Sub-Org Setup →"
+    />
+  )
 }

@@ -312,11 +312,15 @@ export default function SetupClient({
   flowId,
   initialSessionState,
   ignorePersistedSession,
+  nextFlowHref,
+  nextFlowLabel,
 }: {
   steps: StepConfig[]
   flowId: 'parent' | 'sub-org'
   initialSessionState?: SessionState
   ignorePersistedSession?: boolean
+  nextFlowHref?: string
+  nextFlowLabel?: string
 }) {
   const scenarioId = 'custom'
   const flowName = flowId === 'parent' ? 'Parent Org Setup' : 'Sub-Org Setup'
@@ -821,8 +825,16 @@ export default function SetupClient({
                 ) : (
                   <>
                     <span className="text-emerald-600 dark:text-emerald-400 font-medium text-sm">
-                      Setup complete
+                      {nextFlowHref ? 'Parent org setup complete' : 'Setup complete'}
                     </span>
+                    {nextFlowHref && (
+                      <Link
+                        href={nextFlowHref}
+                        className="bg-violet-600 hover:bg-violet-500 text-white font-medium px-5 py-2 rounded-lg text-sm transition-colors"
+                      >
+                        {nextFlowLabel ?? 'Continue →'}
+                      </Link>
+                    )}
                     <a
                       href="https://app.turnkey.com/dashboard/auth/login"
                       target="_blank"

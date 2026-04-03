@@ -7,7 +7,7 @@ import type { StepConfig } from '@/types/scenario'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type AppType = 'consumer' | 'institutional' | 'gaming' | 'treasury'
+type AppType = 'consumer' | 'institutional' | 'gaming' | 'treasury' | 'contracts'
 type Signing = 'custodial' | 'self-custody' | 'shared'
 type Chains = 'evm' | 'solana' | 'bitcoin' | 'multi'
 type Restrictions = 'none' | 'allowlist' | 'sign-only' | 'later'
@@ -32,6 +32,7 @@ type Recommendation = {
 function getRecommendation(answers: Answers): Recommendation {
   const { appType, signing, chains, restrictions } = answers
   const isTreasury = appType === 'treasury'
+  const isContracts = appType === 'contracts'
 
   // ── Parent org steps ─────────────────────────────────────────────────────────
   const parentSteps: RecommendedStep[] = []
@@ -59,7 +60,7 @@ function getRecommendation(answers: Answers): Recommendation {
     })
   }
 
-  if (!isTreasury) {
+  if (!isTreasury && !isContracts) {
     parentSteps.push({
       kind: 'CREATE_USER_TAG',
       title: 'Create User Tag',
@@ -68,12 +69,14 @@ function getRecommendation(answers: Answers): Recommendation {
     })
   }
 
-  if (appType === 'institutional' || isTreasury) {
+  if (appType === 'institutional' || isTreasury || isContracts) {
     parentSteps.push({
       kind: 'CREATE_PRIVATE_KEY_TAG',
       title: 'Create Private Key Tag',
       description: 'Create a tag to classify private keys (e.g. "hot-wallet", "cold-storage").',
-      reason: "Tag private keys by type (e.g. 'hot-wallet', 'cold-storage') for policy-based controls.",
+      reason: isContracts
+        ? "Tag keys by environment — e.g. 'deployer', 'hot-signer', 'cold-signer' — to reference in policy conditions."
+        : "Tag private keys by type (e.g. 'hot-wallet', 'cold-storage') for policy-based controls.",
     })
   }
 
@@ -102,17 +105,23 @@ function getRecommendation(answers: Answers): Recommendation {
   }
 
   if (restrictions !== 'later') {
-    const policyParams = restrictions === 'none' ? { type: 'permissive' }
+    const policyParams = isContracts
+      ? { type: 'contract-only' }
+      : restrictions === 'none' ? { type: 'permissive' }
       : restrictions === 'allowlist' ? { type: 'allow-all' }
       : { type: 'sign-only' }
-    const policyReason = restrictions === 'none'
+    const policyReason = isContracts
+      ? 'Restrict the API user to transaction signing only — covers both contract deployment and function calls, while blocking raw payload signing and admin actions.'
+      : restrictions === 'none'
       ? isTreasury ? 'Allow all signing — tighten this after adding quorum controls.' : 'Create a permissive policy to allow all signing operations in your org.'
       : restrictions === 'allowlist' ? "Create a base policy — you'll add address restrictions per wallet."
       : 'Restrict to signing operations only — prevents any admin actions from your API user.'
     parentSteps.push({
       kind: 'CREATE_POLICY',
-      title: isTreasury ? 'Create Treasury Policy' : 'Create Org Policy',
-      description: 'Create a top-level policy governing signing permissions across your organization.',
+      title: isTreasury ? 'Create Treasury Policy' : isContracts ? 'Create Contract Signing Policy' : 'Create Org Policy',
+      description: isContracts
+        ? 'Create a policy that restricts the API user to transaction signing only (deploy + contract calls).'
+        : 'Create a top-level policy governing signing permissions across your organization.',
       params: policyParams,
       reason: policyReason,
     })
@@ -157,13 +166,17 @@ function getRecommendation(answers: Answers): Recommendation {
   if (!isTreasury) {
     subOrgSteps.push({
       kind: 'CREATE_SUB_ORG',
-      title: 'Create Sub-Organization',
-      description: 'Create a sub-org for your end user. You retain root access during setup.',
-      reason: 'Create a dedicated sub-org for each end user — you retain root access during setup.',
+      title: isContracts ? 'Create Deployer Sub-Organization' : 'Create Sub-Organization',
+      description: isContracts
+        ? 'Create an isolated sub-org for this deployer identity. Each contract environment (dev, staging, prod) can have its own sub-org.'
+        : 'Create a sub-org for your end user. You retain root access during setup.',
+      reason: isContracts
+        ? 'Isolate each deployer or environment in its own sub-org — keeps keys and policies cleanly separated.'
+        : 'Create a dedicated sub-org for each end user — you retain root access during setup.',
     })
 
     const walletReasonMap: Record<Chains, string> = {
-      evm: 'Create an Ethereum wallet with a standard EVM account.',
+      evm: isContracts ? 'Create the Ethereum deployer wallet — this address will sign deployment and function-call transactions.' : 'Create an Ethereum wallet with a standard EVM account.',
       solana: 'Create a Solana wallet with an ed25519 account.',
       bitcoin: 'Create a Bitcoin wallet with a P2WPKH account.',
       multi: 'Create a primary wallet — add accounts for each chain after.',
@@ -171,8 +184,10 @@ function getRecommendation(answers: Answers): Recommendation {
 
     subOrgSteps.push({
       kind: 'CREATE_WALLET',
-      title: 'Create Wallet',
-      description: 'Create the primary wallet for this sub-org.',
+      title: isContracts ? 'Create Deployer Wallet' : 'Create Wallet',
+      description: isContracts
+        ? 'Create the Ethereum HD wallet whose address will deploy contracts and sign on-chain calls.'
+        : 'Create the primary wallet for this sub-org.',
       reason: walletReasonMap[chains],
     })
 
@@ -186,17 +201,23 @@ function getRecommendation(answers: Answers): Recommendation {
     }
 
     if (restrictions !== 'later') {
-      const policyParams = restrictions === 'none' ? { type: 'permissive' }
+      const policyParams = isContracts
+        ? { type: 'contract-only' }
+        : restrictions === 'none' ? { type: 'permissive' }
         : restrictions === 'allowlist' ? { type: 'permissive' }
         : { type: 'sign-only' }
-      const policyReason = restrictions === 'none'
+      const policyReason = isContracts
+        ? 'Restrict this sub-org to transaction signing only — allows deployment and contract calls, blocks raw payload signing and admin actions.'
+        : restrictions === 'none'
         ? 'Allow all signing in this sub-org — suitable for a managed custodial setup.'
         : restrictions === 'allowlist' ? "Create a policy you'll customize with the end user's allowed addresses."
         : 'Restrict this sub-org to signing only — prevents wallet creation or user changes.'
       subOrgSteps.push({
         kind: 'CREATE_POLICY',
-        title: 'Create Sub-Org Policy',
-        description: 'Create a signing policy scoped to this sub-org.',
+        title: isContracts ? 'Create Contract Signing Policy' : 'Create Sub-Org Policy',
+        description: isContracts
+          ? 'Create a policy allowing only transaction signing (deploy + contract calls) for the API user.'
+          : 'Create a signing policy scoped to this sub-org.',
         params: policyParams,
         reason: policyReason,
       })
@@ -205,9 +226,13 @@ function getRecommendation(answers: Answers): Recommendation {
     if (signing !== 'self-custody') {
       subOrgSteps.push({
         kind: 'CREATE_API_USER',
-        title: 'Create API User',
-        description: 'Create an API-only user for server-side access.',
-        reason: 'Create a server-side API user for programmatic access to this sub-org.',
+        title: isContracts ? 'Create Deployer API User' : 'Create API User',
+        description: isContracts
+          ? 'Create the server-side API user that will sign deployment and contract call transactions.'
+          : 'Create an API-only user for server-side access.',
+        reason: isContracts
+          ? 'This API user will be the consensus approver in the contract signing policy — its key pair signs transactions server-side.'
+          : 'Create a server-side API user for programmatic access to this sub-org.',
       })
     }
   }
@@ -216,6 +241,8 @@ function getRecommendation(answers: Answers): Recommendation {
   let summary: string
   if (isTreasury) {
     summary = 'Internal treasury setup — wallets and users live directly in the parent org. No sub-orgs needed. Team members are invited and root quorum can be set for multi-approver security.'
+  } else if (isContracts) {
+    summary = 'Smart contract management setup. Each deployer identity or environment gets its own sub-org with an isolated wallet and a contract-signing-only policy. After setup, use the custom builder or Interact to sign deployment and function-call transactions.'
   } else if (appType === 'gaming') {
     summary = 'Gaming or NFT platform setup. Wallets are created per user in isolated sub-orgs with policies to control what assets can be moved.'
   } else if (appType === 'institutional') {
@@ -240,6 +267,7 @@ const questions = [
       { value: 'institutional' as const, label: 'Trading / institutional', sublabel: 'Institutional or high-volume platform' },
       { value: 'gaming' as const, label: 'Gaming or NFT platform', sublabel: 'Game items, collectibles, or NFTs' },
       { value: 'treasury' as const, label: 'Internal treasury / custody', sublabel: 'Company-controlled funds' },
+      { value: 'contracts' as const, label: 'Smart contract management', sublabel: 'Deploy and call contracts server-side' },
     ],
   },
   {
@@ -311,10 +339,16 @@ export default function RecommendPage() {
     }
   }
 
-  function launchParent(steps: RecommendedStep[]) {
+  function launchParent(parentSteps: RecommendedStep[], subOrgSteps: RecommendedStep[]) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const stepConfigs: StepConfig[] = steps.map(({ reason: _r, optional: _o, ...s }) => s)
-    sessionStorage.setItem('custom-setup-parent', JSON.stringify(stepConfigs))
+    const stripExtra = ({ reason: _r, optional: _o, ...s }: RecommendedStep): StepConfig => s
+    sessionStorage.setItem('custom-setup-parent', JSON.stringify(parentSteps.map(stripExtra)))
+    if (subOrgSteps.length > 0) {
+      // Stash under a dedicated key so custom/parent/page.tsx can offer a "Continue →" handoff
+      sessionStorage.setItem('tk-recommend-suborg', JSON.stringify(subOrgSteps.map(stripExtra)))
+    } else {
+      sessionStorage.removeItem('tk-recommend-suborg')
+    }
     router.push('/setup/custom/parent')
   }
 
@@ -453,7 +487,7 @@ export default function RecommendPage() {
               </ol>
 
               <button
-                onClick={() => launchParent(recommendation.parentSteps)}
+                onClick={() => launchParent(recommendation.parentSteps, recommendation.subOrgSteps)}
                 className="w-full bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-colors"
               >
                 Start Parent Org Setup &rarr;

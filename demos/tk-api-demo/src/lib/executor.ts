@@ -103,6 +103,12 @@ function getPolicyConfig(params: { type?: string; allowedAddress?: string }): {
         effect: 'EFFECT_ALLOW',
         condition: "activity.resource == 'AUTH' && activity.action == 'CREATE'",
       }
+    case 'contract-only':
+      return {
+        policyName: 'Contract Signing Policy',
+        effect: 'EFFECT_ALLOW',
+        condition: "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2'",
+      }
     default: // address-allowlist
       return {
         policyName: 'Address Allowlist',
@@ -186,7 +192,41 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
     }
 
     case 'SIGN_TRANSACTION': {
-      const { useAllowedAddress } = step.params as { useAllowedAddress: boolean }
+      const params = step.params as { useAllowedAddress?: boolean; type?: string }
+
+      if (params.type === 'deploy') {
+        return {
+          organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+          signWith: state.walletAddress ?? annotate('<walletAddress>', 'deployer address from wallet step'),
+          type: 'TRANSACTION_TYPE_ETHEREUM',
+          transaction: {
+            to: annotate(null, 'null = contract deployment — no recipient, Ethereum will assign a contract address'),
+            data: annotate('0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358', 'compiled contract bytecode — replace with the output of your Solidity/Vyper compiler'),
+            value: annotate('0', 'ETH to send with deployment — usually 0 unless the constructor is payable'),
+            type: 'EIP-1559',
+            chainId: 1,
+            gasLimit: annotate(500000, 'deployment uses more gas than a simple transfer — estimate via eth_estimateGas'),
+          },
+        }
+      }
+
+      if (params.type === 'contract-call') {
+        const contractAddress = state.allowedAddress ?? '0x6B175474E89094C44Da98b954EedeAC495271d0F'
+        return {
+          organizationId: state.subOrgId ?? annotate('<subOrgId>', 'from step 1'),
+          signWith: state.walletAddress ?? annotate('<walletAddress>', 'from wallet step'),
+          type: 'TRANSACTION_TYPE_ETHEREUM',
+          transaction: {
+            to: annotate(contractAddress, 'deployed contract address — the target of this call'),
+            data: annotate('0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000de0b6b3a7640000', 'ABI-encoded transfer(address,uint256) — 0xa9059cbb is the function selector; replace data with your own encoded calldata'),
+            value: annotate('0', 'ETH value — 0 for non-payable functions'),
+            type: 'EIP-1559',
+            chainId: 1,
+          },
+        }
+      }
+
+      const useAllowedAddress = params.useAllowedAddress ?? false
       const targetAddress = useAllowedAddress
         ? (state.allowedAddress ?? annotate('<allowedAddress>', 'from policy'))
         : '0x000000000000000000000000000000000000dEaD'
@@ -544,7 +584,7 @@ export async function executeStep(
     case 'CREATE_POLICY':
       return executeCreatePolicy(step, state, step.params as { type?: string; allowedAddress?: string }, ov)
     case 'SIGN_TRANSACTION':
-      return executeSignTransaction(step, state, step.params as { useAllowedAddress: boolean }, ov)
+      return executeSignTransaction(step, state, step.params as { useAllowedAddress?: boolean; type?: string }, ov)
     case 'SIGN_RAW_PAYLOAD':
       return executeSignRawPayload(step, state, ov)
     case 'GET_WHO_AM_I':
@@ -823,10 +863,79 @@ async function executeCreatePolicy(
 async function executeSignTransaction(
   step: StepConfig,
   state: SessionState,
-  params: { useAllowedAddress: boolean },
+  params: { useAllowedAddress?: boolean; type?: string },
   override?: Record<string, unknown>
 ): Promise<StepResult> {
-  const targetAddress = params.useAllowedAddress
+  const client = apiUserClient(
+    state.apiUserPublicKey!,
+    state.apiUserPrivateKey!,
+    state.subOrgId!
+  )
+
+  if (params.type === 'deploy') {
+    const tx = new ethers.Transaction()
+    tx.to = null
+    // Minimal EVM bytecode — a no-op contract. Replace with your compiled artifact in production.
+    tx.data = '0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358'
+    tx.value = 0n
+    tx.gasLimit = (override?.gasLimit ? BigInt(override.gasLimit as number) : 500_000n)
+    tx.maxFeePerGas = ethers.parseUnits('50', 'gwei')
+    tx.maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
+    tx.nonce = 0
+    tx.chainId = override?.chainId ? BigInt(override.chainId as number) : 1n
+    tx.type = 2
+
+    try {
+      const response = await client.signTransaction({
+        organizationId: (override?.organizationId as string | undefined) ?? state.subOrgId!,
+        signWith: (override?.signWith as string | undefined) ?? state.walletAddress!,
+        unsignedTransaction: tx.unsignedSerialized.slice(2),
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      })
+      return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+    } catch (error) {
+      return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+    }
+  }
+
+  if (params.type === 'contract-call') {
+    const iface = new ethers.Interface(['function transfer(address,uint256)'])
+    const calldata = iface.encodeFunctionData('transfer', [
+      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      ethers.parseEther('1'),
+    ])
+
+    const tx = new ethers.Transaction()
+    // Use allowedAddress from state if present (e.g. set by an address-allowlist policy step),
+    // otherwise fall back to the DAI token contract on mainnet as a realistic demo target.
+    tx.to = (override?.to as string | undefined)
+      ?? state.allowedAddress
+      ?? '0x6B175474E89094C44Da98b954EedeAC495271d0F'
+    tx.data = (override?.data as string | undefined) ?? calldata
+    tx.value = 0n
+    tx.gasLimit = 100_000n
+    tx.maxFeePerGas = ethers.parseUnits('50', 'gwei')
+    tx.maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
+    tx.nonce = 0
+    tx.chainId = override?.chainId ? BigInt(override.chainId as number) : 1n
+    tx.type = 2
+
+    try {
+      const response = await client.signTransaction({
+        organizationId: (override?.organizationId as string | undefined) ?? state.subOrgId!,
+        signWith: (override?.signWith as string | undefined) ?? state.walletAddress!,
+        unsignedTransaction: tx.unsignedSerialized.slice(2),
+        type: 'TRANSACTION_TYPE_ETHEREUM',
+      })
+      return { success: true, request: buildDisplayRequest(step, state), response: trimResponse(response), updatedState: state }
+    } catch (error) {
+      return { success: false, request: buildDisplayRequest(step, state), response: formatError(error), updatedState: state }
+    }
+  }
+
+  // Standard EIP-1559 transfer (allowlist check demo)
+  const useAllowedAddress = params.useAllowedAddress ?? false
+  const targetAddress = useAllowedAddress
     ? state.allowedAddress!
     : '0x000000000000000000000000000000000000dEaD'
 
@@ -840,15 +949,8 @@ async function executeSignTransaction(
   tx.chainId = override?.chainId ? BigInt(override.chainId as number) : 1n
   tx.type = 2
 
-  const unsignedTransaction = tx.unsignedSerialized.slice(2) // strip 0x
-
-  const client = apiUserClient(
-    state.apiUserPublicKey!,
-    state.apiUserPrivateKey!,
-    state.subOrgId!
-  )
-
-  const expectedFailure = !params.useAllowedAddress
+  const unsignedTransaction = tx.unsignedSerialized.slice(2)
+  const expectedFailure = !useAllowedAddress
 
   try {
     const response = await client.signTransaction({
