@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { StepConfig } from '@/types/scenario'
@@ -14,6 +14,14 @@ const QUERIES = CATALOG.filter((c) => c.category === 'query')
 // ── Build page ─────────────────────────────────────────────────────────────
 
 export default function BuildPage() {
+  return (
+    <Suspense>
+      <BuildPageInner />
+    </Suspense>
+  )
+}
+
+function BuildPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const flow = (searchParams.get('flow') ?? 'sub-org') as 'parent' | 'sub-org'
