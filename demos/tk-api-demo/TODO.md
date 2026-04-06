@@ -107,15 +107,37 @@ Replace the current preset dropdown with a visual policy builder. The builder sh
 
 ## Org Explorer
 
+### Layout & Navigation
+
+- **Fixed right sidebar** — the biggest friction point: clicking a node requires scrolling down to see the detail panel. Move it to a persistent right sidebar (`w-96`, slide-in on selection) so the tree stays fully visible while browsing details. Layout becomes tree (70%) + sidebar (30%).
+
+- **Keyboard navigation** — arrow keys to move between nodes, `Escape` to deselect, `Enter` to expand/collapse wallet accounts.
+
+- **Search / filter bar** — text input above the tree that filters nodes by name or ID. Highlight matches with a colored ring rather than hiding non-matches so the tree structure stays visible. High value once sub-org count exceeds ~8.
+
+### Node Information
+
+- **Hover preview tooltip** — show wallet count, user count, and policy count on hover without requiring a click. Data is already available from the org-map fetch.
+
+- **Status badges on cards** — small badge counts on each sub-org card (e.g. `3 wallets · 2 policies`). Colored dot indicators: green = has wallets, amber = has pending activity.
+
 - **Wallet accounts** — sub-org wallet detail shows `walletId` but not the derived accounts/addresses. Add a "Load accounts" expansion that fetches `getWalletAccounts` for the selected wallet.
 
-- **Activity feed** — add a "Recent Activities" section in the sub-org detail panel (calls `getActivities`).
-
-- **Pagination for sub-orgs** — the explorer fetches up to 24 sub-orgs. Add a "Load more" control when `totalSubOrgs > fetchedSubOrgCount`.
+### Detail Panel Actions
 
 - **Click-to-interact** — add an "Interact →" button in the sub-org detail panel that pre-populates the interact page with that sub-org's ID and known wallet IDs, skipping the org selector step.
 
 - **Copy org/wallet IDs** — inline copy buttons on every ID shown in detail panels (currently only the session state sidebar has copy buttons).
+
+- **Activity feed** — add a collapsible "Recent Activities" section in the sub-org detail panel (calls `getActivities` with limit 10). Answers the common debugging question "what happened in this org recently?" without leaving the page.
+
+- **Delete via context menu** — move the delete action to a `⋯` overflow button on hover instead of a button always visible in the detail panel. Reduces visual noise and accidental clicks.
+
+### Tree & Empty States
+
+- **Pagination for sub-orgs** — the explorer fetches up to 24 sub-orgs. Add a "Load more" control when `totalSubOrgs > fetchedSubOrgCount`.
+
+- **Empty state with CTA** — when there are no sub-orgs, replace the empty tree area with a centered prompt linking to the recommender or build page.
 
 ---
 
