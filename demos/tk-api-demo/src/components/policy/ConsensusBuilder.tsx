@@ -8,9 +8,15 @@ import { Select } from "@/components/ui/select"
 import { Plus, Trash2, Users, ExternalLink } from "lucide-react"
 import type { ConsensusConfig, UserCondition, TagCondition, CredentialCondition } from "@/types/policy"
 
+interface OrgUser {
+  id: string
+  name: string
+}
+
 interface ConsensusBuilderProps {
   config: ConsensusConfig
   onChange: (config: ConsensusConfig) => void
+  orgUsers?: OrgUser[]
 }
 
 const operatorOptions = [
@@ -41,7 +47,7 @@ const operatorOptions2 = [
   { value: "!=", label: "not equals (!=)" },
 ]
 
-export function ConsensusBuilder({ config, onChange }: ConsensusBuilderProps) {
+export function ConsensusBuilder({ config, onChange, orgUsers }: ConsensusBuilderProps) {
   const addUser = () => {
     const newUser: UserCondition = { id: crypto.randomUUID(), userId: "" }
     onChange({ ...config, users: [...config.users, newUser] })
@@ -156,8 +162,24 @@ export function ConsensusBuilder({ config, onChange }: ConsensusBuilderProps) {
           {config.users.map((user) => (
             <div key={user.id} className="flex items-center gap-2">
               <div className="flex-1">
-                <Input placeholder="Enter User ID (UUID)" value={user.userId}
-                  onChange={(e) => updateUser(user.id, e.target.value)} />
+                {orgUsers && orgUsers.length > 0 ? (
+                  <Select
+                    options={[
+                      { value: '', label: 'Select a user…' },
+                      ...orgUsers.map((u) => ({
+                        value: u.id,
+                        label: u.name !== u.id
+                          ? `${u.name} (${u.id.slice(0, 8)}…)`
+                          : u.id,
+                      })),
+                    ]}
+                    value={user.userId}
+                    onChange={(e) => updateUser(user.id, e.target.value)}
+                  />
+                ) : (
+                  <Input placeholder="Enter User ID (UUID)" value={user.userId}
+                    onChange={(e) => updateUser(user.id, e.target.value)} />
+                )}
               </div>
               <Button type="button" variant="ghost" size="icon" onClick={() => removeUser(user.id)}>
                 <Trash2 className="h-4 w-4 text-destructive" />

@@ -83,6 +83,19 @@ export default function Home() {
         </Link>
       </div>
 
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-10 mb-3">Scenarios</p>
+      <div className="space-y-4 mb-10">
+        <Link href="/setup/policies" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-violet-600 dark:group-hover:text-violet-300 transition-colors">Policy Manager</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Select any org or sub-org and manage its policies — create with the visual builder, edit, or delete.</p>
+            </div>
+            <span className="text-gray-400 dark:text-gray-600 group-hover:text-violet-500 dark:group-hover:text-violet-400 transition-colors text-lg leading-none shrink-0 mt-1">→</span>
+          </div>
+        </Link>
+      </div>
+
       <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-10 mb-3">Run &amp; Explore</p>
       <div className="space-y-4 mb-10">
       <Link href="/interact" className="block border border-gray-200 dark:border-gray-800 rounded-xl p-6 bg-white dark:bg-transparent hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all group">

@@ -24,12 +24,24 @@ const defaultConfig: PolicyConfig = {
   notes: "",
 }
 
-interface PolicyBuilderProps {
-  onApply?: (policy: TurnkeyPolicy) => void
+interface OrgUser {
+  id: string
+  name: string
 }
 
-export function PolicyBuilder({ onApply }: PolicyBuilderProps) {
-  const [config, setConfig] = useState<PolicyConfig>(defaultConfig)
+interface PolicyBuilderProps {
+  onApply?: (policy: TurnkeyPolicy) => void
+  applyLabel?: string
+  initialPolicy?: { policyName?: string; effect?: PolicyEffect }
+  orgUsers?: OrgUser[]
+}
+
+export function PolicyBuilder({ onApply, applyLabel = 'Apply to Step', initialPolicy, orgUsers }: PolicyBuilderProps) {
+  const [config, setConfig] = useState<PolicyConfig>(() => ({
+    ...defaultConfig,
+    ...(initialPolicy?.policyName ? { policyName: initialPolicy.policyName } : {}),
+    ...(initialPolicy?.effect ? { effect: initialPolicy.effect } : {}),
+  }))
   const [policy, setPolicy] = useState<TurnkeyPolicy>(() => buildPolicy(defaultConfig))
 
   useEffect(() => { setPolicy(buildPolicy(config)) }, [config])
@@ -87,7 +99,8 @@ export function PolicyBuilder({ onApply }: PolicyBuilderProps) {
               <div className="border-t" />
 
               <ConsensusBuilder config={config.consensus || defaultConsensus}
-                onChange={(consensus: ConsensusConfig) => updateConfig("consensus", consensus)} />
+                onChange={(consensus: ConsensusConfig) => updateConfig("consensus", consensus)}
+                orgUsers={orgUsers} />
 
               <div className="border-t" />
 
@@ -112,7 +125,7 @@ export function PolicyBuilder({ onApply }: PolicyBuilderProps) {
                   <Button type="button"
                     className="bg-violet-600 hover:bg-violet-500 text-white border-violet-600"
                     onClick={() => onApply(policy)}>
-                    Apply to Step
+                    {applyLabel}
                   </Button>
                 )}
               </div>

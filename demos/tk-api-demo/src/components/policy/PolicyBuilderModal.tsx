@@ -5,13 +5,23 @@ import { X } from "lucide-react"
 import { PolicyBuilder } from "@/components/policy/PolicyBuilder"
 import type { TurnkeyPolicy } from "@/types/policy"
 
+interface OrgUser {
+  id: string
+  name: string
+}
+
 interface PolicyBuilderModalProps {
   open: boolean
   onClose: () => void
   onApply: (policy: TurnkeyPolicy) => void
+  title?: string
+  subtitle?: string
+  applyLabel?: string
+  initialPolicy?: { policyName?: string; effect?: 'EFFECT_ALLOW' | 'EFFECT_DENY' }
+  orgUsers?: OrgUser[]
 }
 
-export function PolicyBuilderModal({ open, onClose, onApply }: PolicyBuilderModalProps) {
+export function PolicyBuilderModal({ open, onClose, onApply, title, subtitle, applyLabel, initialPolicy, orgUsers }: PolicyBuilderModalProps) {
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
@@ -26,9 +36,9 @@ export function PolicyBuilderModal({ open, onClose, onApply }: PolicyBuilderModa
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
         <div>
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Policy Builder</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title ?? 'Policy Builder'}</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Build a policy visually, then click &quot;Apply to Step&quot; to inject it into the request.
+            {subtitle ?? 'Build a policy visually, then click \u201cApply to Step\u201d to inject it into the request.'}
           </p>
         </div>
         <button
@@ -43,7 +53,12 @@ export function PolicyBuilderModal({ open, onClose, onApply }: PolicyBuilderModa
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
-          <PolicyBuilder onApply={(policy) => { onApply(policy); onClose() }} />
+          <PolicyBuilder
+            onApply={(policy) => { onApply(policy); onClose() }}
+            applyLabel={applyLabel}
+            initialPolicy={initialPolicy}
+            orgUsers={orgUsers}
+          />
         </div>
       </div>
     </div>

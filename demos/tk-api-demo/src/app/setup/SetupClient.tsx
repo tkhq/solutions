@@ -346,6 +346,7 @@ export default function SetupClient({
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipValues, setSkipValues] = useState<Record<string, string>>({})
   const [policyBuilderOpen, setPolicyBuilderOpen] = useState(false)
+  const [policyBuilderOrgUsers, setPolicyBuilderOrgUsers] = useState<{ id: string; name: string }[]>([])
 
   // Ref to always have latest stepStates in effects without re-triggering them
   const stepStatesRef = useRef(stepStates)
@@ -899,7 +900,17 @@ export default function SetupClient({
                       <>
                         <span className="text-gray-300 dark:text-gray-700">|</span>
                         <button
-                          onClick={() => setPolicyBuilderOpen(true)}
+                          onClick={async () => {
+                            const orgId = sessionState.subOrgId
+                            if (orgId) {
+                              try {
+                                const r = await fetch(`/api/users?orgId=${encodeURIComponent(orgId)}`)
+                                const d = await r.json()
+                                if (!d.error) setPolicyBuilderOrgUsers(d.users ?? [])
+                              } catch { /* ignore, fall back to manual input */ }
+                            }
+                            setPolicyBuilderOpen(true)
+                          }}
                           className="text-xs font-medium text-violet-500 hover:text-violet-400 transition-colors"
                         >
                           Build Policy
@@ -1026,7 +1037,8 @@ export default function SetupClient({
 
       <PolicyBuilderModal
         open={policyBuilderOpen}
-        onClose={() => setPolicyBuilderOpen(false)}
+        onClose={() => { setPolicyBuilderOpen(false); setPolicyBuilderOrgUsers([]) }}
+        orgUsers={policyBuilderOrgUsers}
         onApply={(policy: TurnkeyPolicy) => {
           try {
             const current = JSON.parse(editedRequest)

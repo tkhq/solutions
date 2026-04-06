@@ -18,6 +18,16 @@ export const subOrgSteps: StepConfig[] = [
   { kind: 'CREATE_API_USER', title: 'Create API User', description: 'Create an API-only user for server-side access. The end user claims their access via the Turnkey dashboard.' },
 ]
 
+export const policyManagerSteps: StepConfig[] = [
+  { kind: 'CREATE_SUB_ORG', title: 'Create Sub-Organization', description: 'Create a sub-org to scope these policies to.' },
+  { kind: 'CREATE_API_USER', title: 'Create API User', description: 'Create an API-only user for executing policy operations.' },
+  { kind: 'LIST_POLICIES', title: 'List Existing Policies', description: 'Inspect all policies currently active in this sub-org.' },
+  { kind: 'CREATE_POLICY', title: 'Create Policy', description: 'Define a new policy using the visual policy builder. Restricts or allows operations based on conditions you set.', params: { type: 'permissive' } },
+  { kind: 'GET_POLICY', title: 'Inspect Policy', description: 'Fetch the full details of the newly created policy to verify it looks correct.' },
+  { kind: 'UPDATE_POLICY', title: 'Update Policy', description: 'Modify the policy with the visual builder. Changes take effect immediately.' },
+  { kind: 'DELETE_POLICY', title: 'Delete Policy', description: 'Remove the policy. The API user will no longer have access granted by this policy.' },
+]
+
 export const SDK_METHODS: Record<string, string> = {
   CREATE_SUB_ORG: 'createSubOrganization',
   CREATE_WALLET: 'createWallet',
