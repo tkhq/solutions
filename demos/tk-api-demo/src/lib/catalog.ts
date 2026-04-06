@@ -683,3 +683,34 @@ export function isAvailable(item: CatalogItem, currentSteps: CatalogItem[], seed
   const available = computeAvailableState(currentSteps, seed)
   return item.requires.every((r) => available.has(r))
 }
+
+const KEY_LABELS: Record<string, string> = {
+  subOrgId: 'Sub-Org ID',
+  walletId: 'Wallet ID',
+  walletAddress: 'Wallet Address',
+  apiUserId: 'API User ID',
+  apiUserPublicKey: 'API User Public Key',
+  apiUserPrivateKey: 'API User Private Key',
+  policyId: 'Policy ID',
+  allowedAddress: 'Allowed Address',
+  privateKeyId: 'Private Key ID',
+  userTagId: 'User Tag ID',
+  privateKeyTagId: 'Private Key Tag ID',
+  apiKeyId: 'API Key ID',
+  rootUserId: 'Root User ID',
+}
+
+/** Returns the session state keys that are missing for this item given the current available set. */
+export function getMissingKeys(item: CatalogItem, available: Set<string>): string[] {
+  return item.requires.filter((r) => !available.has(r))
+}
+
+/** Returns catalog items that produce the given session state key. */
+export function getProvidersForKey(key: string): CatalogItem[] {
+  return CATALOG.filter((item) => item.provides.includes(key))
+}
+
+/** Returns a human-readable label for a session state key. */
+export function keyLabel(key: string): string {
+  return KEY_LABELS[key] ?? key
+}

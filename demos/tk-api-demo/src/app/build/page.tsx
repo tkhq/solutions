@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { StepConfig } from '@/types/scenario'
-import { type CatalogItem, CATALOG, computeAvailableState, isAvailable } from '@/lib/catalog'
+import { type CatalogItem, CATALOG, computeAvailableState, isAvailable, getMissingKeys, getProvidersForKey, keyLabel } from '@/lib/catalog'
+import { Tooltip } from '@/components/ui/tooltip'
 
 
 const ACTIVITIES = CATALOG.filter((c) => c.category === 'activity')
@@ -187,13 +188,15 @@ function CatalogSection({
   selectedSteps: CatalogItem[]
   onAdd: (item: CatalogItem) => void
 }) {
+  const currentAvailable = computeAvailableState(selectedSteps)
   return (
     <div>
       <h2 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">{title}</h2>
       <div className="space-y-2">
         {items.map((item) => {
-          const available = isAvailable(item, selectedSteps)
-          return (
+          const available = item.requires.every((r) => currentAvailable.has(r))
+          const missing = available ? [] : getMissingKeys(item, currentAvailable)
+          const card = (
             <div
               key={item.id}
               className={`border rounded-lg p-3 transition-colors ${
@@ -226,7 +229,7 @@ function CatalogSection({
                         <span
                           key={r}
                           className={`text-[10px] px-1 py-px rounded font-mono ${
-                            computeAvailableState(selectedSteps).has(r)
+                            currentAvailable.has(r)
                               ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
                           }`}
@@ -247,6 +250,45 @@ function CatalogSection({
               </div>
             </div>
           )
+
+          if (!available && missing.length > 0) {
+            return (
+              <Tooltip
+                key={item.id}
+                className="w-full"
+                side="right"
+                content={
+                  <div className="space-y-1.5 text-xs w-64">
+                    <p className="font-semibold text-white mb-2">Not yet available</p>
+                    {missing.map((key) => {
+                      const providers = getProvidersForKey(key)
+                      const allSameKind = providers.length > 1 && providers.every(p => p.kind === providers[0].kind)
+                      const providerLabel = allSameKind
+                        ? `any ${providers[0].kind.toLowerCase().replace(/_/g, ' ')} step`
+                        : providers.length <= 2
+                          ? providers.map(p => p.title).join(' or ')
+                          : `${providers[0].title} (or ${providers.length - 1} similar)`
+                      return (
+                        <div key={key} className="flex gap-1.5">
+                          <span className="text-amber-400 shrink-0">•</span>
+                          <span className="text-gray-200">
+                            <span className="font-mono text-amber-300">{key}</span>
+                            {providers.length > 0
+                              ? <> — add <span className="font-medium text-white">{providerLabel}</span> first</>
+                              : <> ({keyLabel(key)})</>
+                            }
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                }
+              >
+                {card}
+              </Tooltip>
+            )
+          }
+          return card
         })}
       </div>
     </div>

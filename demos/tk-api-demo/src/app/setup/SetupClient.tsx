@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type { SessionState, StepResult, StepKind, StepConfig } from '@/types/scenario'
 import { SDK_METHODS } from '@/lib/setup-flows'
+import { PolicyBuilderModal } from '@/components/policy/PolicyBuilderModal'
+import type { TurnkeyPolicy } from '@/types/policy'
 
 const PARENT_STATE_KEY = 'tk-parent-org-state'
 const flowSessionKey = (flowId: string) => `tk-session-${flowId}`
@@ -343,6 +345,7 @@ export default function SetupClient({
   const [confirmingDestructive, setConfirmingDestructive] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [skipValues, setSkipValues] = useState<Record<string, string>>({})
+  const [policyBuilderOpen, setPolicyBuilderOpen] = useState(false)
 
   // Ref to always have latest stepStates in effects without re-triggering them
   const stepStatesRef = useRef(stepStates)
@@ -892,6 +895,17 @@ export default function SetupClient({
                     >
                       Code
                     </button>
+                    {(steps[currentStep].kind === 'CREATE_POLICY' || steps[currentStep].kind === 'UPDATE_POLICY') && (isPending || currentStepState.status === 'error') && (
+                      <>
+                        <span className="text-gray-300 dark:text-gray-700">|</span>
+                        <button
+                          onClick={() => setPolicyBuilderOpen(true)}
+                          className="text-xs font-medium text-violet-500 hover:text-violet-400 transition-colors"
+                        >
+                          Build Policy
+                        </button>
+                      </>
+                    )}
                     <div className="flex-1" />
                     {requestTab === 'request' && badge}
                     {requestTab === 'request' && (isPending || currentStepState.status === 'error') && (
@@ -1009,6 +1023,36 @@ export default function SetupClient({
           </div>
         </div>
       </main>
+
+      <PolicyBuilderModal
+        open={policyBuilderOpen}
+        onClose={() => setPolicyBuilderOpen(false)}
+        onApply={(policy: TurnkeyPolicy) => {
+          try {
+            const current = JSON.parse(editedRequest)
+            const updated = {
+              ...current,
+              ...(policy.policyName && { policyName: policy.policyName }),
+              effect: policy.effect,
+              ...(policy.condition !== undefined && { condition: policy.condition }),
+              ...(policy.consensus !== undefined && { consensus: policy.consensus }),
+              ...(policy.notes !== undefined && { notes: policy.notes }),
+            }
+            setEditedRequest(JSON.stringify(updated, null, 2))
+            setEditMode(false)
+            setRequestParseError(null)
+          } catch {
+            // If editedRequest isn't valid JSON yet, build from scratch
+            setEditedRequest(JSON.stringify({
+              policyName: policy.policyName,
+              effect: policy.effect,
+              condition: policy.condition,
+              consensus: policy.consensus,
+              notes: policy.notes,
+            }, null, 2))
+          }
+        }}
+      />
     </div>
   )
 }
