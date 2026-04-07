@@ -1,5 +1,24 @@
+/**
+ * Pre-defined step sequences for the guided setup flows.
+ *
+ * Each exported array is consumed by a specific setup page to render its
+ * ordered step list.  Steps reference `StepKind` values from the scenario
+ * type system and carry optional `params` that the step executor uses to
+ * vary behavior (e.g. which policy preset to apply).
+ *
+ * These arrays are intentionally kept minimal — they declare intent, not
+ * implementation.  All execution logic lives in the API route handlers.
+ */
 import type { StepConfig } from '@/types/scenario'
 
+/**
+ * Steps shown on the Parent Org Setup page (`/setup/parent-org`).
+ *
+ * Walks through the one-time configuration of the root organization:
+ * verifying credentials, naming the org, enabling features, creating
+ * classification tags, establishing a top-level policy, inviting team
+ * members, and optionally hardening the root quorum.
+ */
 export const parentOrgSteps: StepConfig[] = [
   { kind: 'GET_WHO_AM_I', title: 'Verify Credentials', description: 'Confirm your API keys are working and inspect your organization.' },
   { kind: 'UPDATE_ORGANIZATION_NAME', title: 'Set Organization Name', description: 'Give your organization a clear name for identification.' },
@@ -11,6 +30,13 @@ export const parentOrgSteps: StepConfig[] = [
   { kind: 'UPDATE_ROOT_QUORUM', title: 'Update Root Quorum', description: 'Optionally require multiple approvers for root-level actions, adding a layer of security against single points of failure.' },
 ]
 
+/**
+ * Steps shown on the Sub-Org Setup page (`/setup/sub-org`).
+ *
+ * Covers the per-end-user provisioning flow: creating an isolated sub-org,
+ * spinning up a wallet inside it, attaching a signing policy, and creating
+ * an API user that will authenticate subsequent server-side requests.
+ */
 export const subOrgSteps: StepConfig[] = [
   { kind: 'CREATE_SUB_ORG', title: 'Create Sub-Organization', description: 'Create a sub-org for your end user. You retain root access during setup.' },
   { kind: 'CREATE_WALLET', title: 'Create Wallet', description: 'Create the primary wallet for this sub-org.' },
@@ -18,6 +44,13 @@ export const subOrgSteps: StepConfig[] = [
   { kind: 'CREATE_API_USER', title: 'Create API User', description: 'Create an API-only user for server-side access. The end user claims their access via the Turnkey dashboard.' },
 ]
 
+/**
+ * Steps shown on the Policy Manager page (`/setup/policy-manager`).
+ *
+ * Demonstrates the full policy lifecycle: creating a scoped sub-org and API
+ * user, then listing, creating, inspecting, updating, and deleting a policy
+ * through the visual policy builder.
+ */
 export const policyManagerSteps: StepConfig[] = [
   { kind: 'CREATE_SUB_ORG', title: 'Create Sub-Organization', description: 'Create a sub-org to scope these policies to.' },
   { kind: 'CREATE_API_USER', title: 'Create API User', description: 'Create an API-only user for executing policy operations.' },
@@ -28,6 +61,9 @@ export const policyManagerSteps: StepConfig[] = [
   { kind: 'DELETE_POLICY', title: 'Delete Policy', description: 'Remove the policy. The API user will no longer have access granted by this policy.' },
 ]
 
+// Maps each StepKind to the corresponding @turnkey/sdk-server method name.
+// This drives the code-snippet panel in SetupClient, generating copy-pasteable
+// SDK call examples alongside each step result.
 export const SDK_METHODS: Record<string, string> = {
   CREATE_SUB_ORG: 'createSubOrganization',
   CREATE_WALLET: 'createWallet',

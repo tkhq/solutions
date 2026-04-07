@@ -1,3 +1,18 @@
+/**
+ * Policy compilation pipeline: `PolicyConfig` → `buildPolicy()` → `TurnkeyPolicy`.
+ *
+ * The Turnkey API expects `consensus` and `condition` to be CEL expression
+ * strings (e.g. `"approvers.any(user, user.id == '...')"` or
+ * `"eth.tx.to == '0x...'"`) rather than structured objects.  This module is
+ * responsible for that compilation step.
+ *
+ * Entry point: call `buildPolicy(config)` with a `PolicyConfig` object (as
+ * produced by the visual policy builder UI) to get back a `TurnkeyPolicy` ready
+ * to pass directly to the `createPolicy` or `updatePolicy` API calls.
+ *
+ * `formatPolicyJson` is a thin convenience wrapper for displaying the compiled
+ * policy in the JSON inspector panel.
+ */
 import type {
   PolicyConfig,
   TurnkeyPolicy,
@@ -14,6 +29,17 @@ import type {
 const BOOLEAN_FIELDS = new Set(["imported", "exported"])
 const NUMERIC_ETH_FIELDS = new Set(["value", "gas", "gas_price", "chain_id"])
 
+/**
+ * Compiles a `ConsensusConfig` into a CEL approver expression string.
+ *
+ * The generated expression is suitable for the `consensus` field of a
+ * `TurnkeyPolicy`.  Returns an empty string if the config produces no
+ * meaningful expression (e.g. `operator: "any"` with an empty user list),
+ * which `buildPolicy` treats as "omit the field".
+ *
+ * @param config - Structured consensus configuration from the policy builder UI.
+ * @returns        CEL expression string, or `""` if no expression can be built.
+ */
 export function buildConsensusExpression(config: ConsensusConfig): string {
   switch (config.operator) {
     case "any":
@@ -190,6 +216,21 @@ function buildSigningResourceCondition(conditions: SigningResourceCondition[], j
     .join(` ${join} `)
 }
 
+/**
+ * Compiles a `ConditionConfig` into a CEL condition expression string.
+ *
+ * Dispatches to chain-specific sub-builders (`buildEthereumCondition`,
+ * `buildSolanaCondition`, etc.) and chain-agnostic sub-builders
+ * (`buildActivityCondition`, `buildSigningResourceCondition`), then joins all
+ * non-empty parts with `conditionJoin` (defaulting to `"&&"`).
+ *
+ * If `config.rawCondition` is set the entire builder is bypassed and the raw
+ * string is returned unchanged — useful for condition shapes not supported by
+ * the structured sub-builders.
+ *
+ * @param config - Structured condition configuration from the policy builder UI.
+ * @returns        CEL expression string, or `""` if no conditions are configured.
+ */
 export function buildConditionExpression(config: ConditionConfig): string {
   if (config.rawCondition) {
     return config.rawCondition
@@ -230,6 +271,21 @@ export function buildConditionExpression(config: ConditionConfig): string {
   return parts.join(` ${join} `)
 }
 
+/**
+ * Compiles a `PolicyConfig` into a `TurnkeyPolicy` ready for the API.
+ *
+ * This is the primary entry point of the compilation pipeline:
+ * 1. Copies `policyName` and `effect` verbatim.
+ * 2. Calls `buildConsensusExpression` and attaches the result only if non-empty.
+ * 3. Calls `buildConditionExpression` and attaches the result only if non-empty.
+ * 4. Passes `notes` through if provided.
+ *
+ * The returned object can be spread directly into a `createPolicy` or
+ * `updatePolicy` API call body.
+ *
+ * @param config - Structured policy configuration from the policy builder UI.
+ * @returns        Wire-format `TurnkeyPolicy` with compiled CEL expression strings.
+ */
 export function buildPolicy(config: PolicyConfig): TurnkeyPolicy {
   const policy: TurnkeyPolicy = {
     policyName: config.policyName || "Unnamed Policy",
@@ -251,6 +307,15 @@ export function buildPolicy(config: PolicyConfig): TurnkeyPolicy {
   return policy
 }
 
+/**
+ * Serializes a compiled `TurnkeyPolicy` to a pretty-printed JSON string.
+ *
+ * Used by the JSON inspector panel in the policy builder UI to display the
+ * exact payload that would be sent to the API.
+ *
+ * @param policy - A compiled `TurnkeyPolicy` (typically produced by `buildPolicy`).
+ * @returns        Two-space indented JSON string.
+ */
 export function formatPolicyJson(policy: TurnkeyPolicy): string {
   return JSON.stringify(policy, null, 2)
 }

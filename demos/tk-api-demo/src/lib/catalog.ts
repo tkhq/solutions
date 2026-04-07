@@ -1,15 +1,59 @@
+/**
+ * Step catalog — the complete registry of available Turnkey operations.
+ *
+ * Every operation that can appear in a scenario or be added via the sandbox
+ * catalog is defined here as a `CatalogItem`.  Items declare which
+ * `SessionState` keys they `requires` before they can run and which keys they
+ * `provides` after a successful execution.
+ *
+ * This `requires`/`provides` dependency graph is the mechanism the UI uses to
+ * determine step availability: a catalog item is only enabled once all of its
+ * required keys are present in the accumulated session state.  The utility
+ * functions at the bottom of this file (`computeAvailableState`, `isAvailable`,
+ * `getMissingKeys`, `getProvidersForKey`) implement that logic.
+ */
 import type { StepConfig } from '@/types/scenario'
 
+/**
+ * A single entry in the step catalog.
+ *
+ * Each item describes one Turnkey API operation: its display metadata, its
+ * `StepKind` routing key, and its dependency contract (`requires`/`provides`).
+ */
 export interface CatalogItem {
+  /** Unique slug used as a stable identifier (e.g. `"create-wallet"`). */
   id: string
+  /** The `StepKind` that the executor will dispatch when this item is run. */
   kind: StepConfig['kind']
+  /** Short label rendered in the catalog list and step chips. */
   title: string
+  /** Longer description shown in the catalog detail panel. */
   description: string
+  /**
+   * Optional step-specific parameters forwarded to the executor
+   * (e.g. `{ type: 'permissive' }` to select a policy preset).
+   */
   params?: Record<string, unknown>
+  /**
+   * Whether this item is a state-mutating Turnkey activity or a read-only query.
+   * Used to visually group items in the catalog UI.
+   */
   category: 'activity' | 'query'
+  /** Snake-case Turnkey API endpoint name, used for documentation linking. */
   apiCall: string
+  /** URL to the Turnkey docs page for this operation. */
   docs: string
+  /**
+   * `SessionState` keys that must be present before this item can be executed.
+   * The UI disables the item and surfaces missing-dependency hints when any key
+   * in this list is absent from the current accumulated state.
+   */
   requires: string[]
+  /**
+   * `SessionState` keys that this item populates on success.
+   * Used by `computeAvailableState` to determine which subsequent items become
+   * unlocked after this step runs.
+   */
   provides: string[]
 }
 
@@ -664,8 +708,17 @@ export const CATALOG_ACTIVITIES = CATALOG.filter((c) => c.category === 'activity
 export const CATALOG_QUERIES = CATALOG.filter((c) => c.category === 'query')
 
 /**
- * Accumulate the state keys that become available after running the given steps,
- * starting from an optional seed set.
+ * Accumulates the complete set of `SessionState` keys that would be available
+ * after running the given sequence of steps.
+ *
+ * Starts from an optional `seed` set (representing state already present in the
+ * session) and unions in every key declared in each item's `provides` array.
+ * The result can be passed to `isAvailable` to check whether additional items
+ * are unlocked.
+ *
+ * @param steps - Ordered list of catalog items whose `provides` contributions to accumulate.
+ * @param seed  - Keys already available before the steps run (e.g. from a prior session).
+ * @returns     - The union of `seed` and all keys provided by the given steps.
  */
 export function computeAvailableState(steps: CatalogItem[], seed?: Set<string>): Set<string> {
   const available = seed ? new Set(seed) : new Set<string>()
@@ -676,8 +729,15 @@ export function computeAvailableState(steps: CatalogItem[], seed?: Set<string>):
 }
 
 /**
- * Returns true if all of item's requirements are satisfied by the steps already
- * in the list (plus the optional seed set).
+ * Returns `true` if every key in `item.requires` is satisfied by the steps
+ * already added to the current scenario (plus any optional seed state).
+ *
+ * This is the primary availability gate used by the catalog UI to enable or
+ * disable "Add to scenario" buttons.
+ *
+ * @param item         - The catalog item to check.
+ * @param currentSteps - Steps already present in the current scenario.
+ * @param seed         - Additional keys already in session state before any step runs.
  */
 export function isAvailable(item: CatalogItem, currentSteps: CatalogItem[], seed?: Set<string>): boolean {
   const available = computeAvailableState(currentSteps, seed)
@@ -700,17 +760,55 @@ const KEY_LABELS: Record<string, string> = {
   rootUserId: 'Root User ID',
 }
 
-/** Returns the session state keys that are missing for this item given the current available set. */
+/**
+ * Returns the subset of `item.requires` keys that are absent from `available`.
+ *
+ * Used to surface specific "you still need X and Y" dependency hints in the UI
+ * when a step cannot yet be added to the scenario.
+ *
+ * @param item      - The catalog item whose requirements to check.
+ * @param available - The set of keys currently available in the session.
+ */
 export function getMissingKeys(item: CatalogItem, available: Set<string>): string[] {
   return item.requires.filter((r) => !available.has(r))
 }
 
-/** Returns catalog items that produce the given session state key. */
+/**
+ * Returns all catalog items that produce the given session state key.
+ *
+ * Used to generate "add one of these steps first" suggestions when a dependency
+ * is missing — the UI can present the providers so the user can pick one to
+ * add before the blocked step.
+ *
+ * @param key - A `SessionState` key (e.g. `"subOrgId"`, `"walletId"`).
+ */
 export function getProvidersForKey(key: string): CatalogItem[] {
   return CATALOG.filter((item) => item.provides.includes(key))
 }
 
-/** Returns a human-readable label for a session state key. */
+/**
+ * Returns a human-readable display label for a `SessionState` key.
+ *
+ * Falls back to the raw key name if no label is registered, so new keys added
+ * to `SessionState` degrade gracefully without requiring a parallel update here.
+ *
+ * @param key - A `SessionState` key (e.g. `"subOrgId"`).
+ * @returns   - A formatted label (e.g. `"Sub-Org ID"`).
+ */
 export function keyLabel(key: string): string {
   return KEY_LABELS[key] ?? key
+}
+
+/**
+ * Looks up the catalog entry for a given `StepKind`.
+ *
+ * Some step kinds (e.g. `GET_WHO_AM_I`, `REMOVE_ORG_FEATURE`) are not browseable
+ * in the catalog UI and will return `undefined`. Callers should handle the
+ * missing case gracefully.
+ *
+ * @param kind - The `StepKind` to look up.
+ * @returns    - The first matching `CatalogItem`, or `undefined` if not registered.
+ */
+export function getCatalogItem(kind: string): CatalogItem | undefined {
+  return CATALOG.find((item) => item.kind === kind)
 }

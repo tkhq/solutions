@@ -26,5 +26,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Step ${stepIndex} not found` }, { status: 400 })
   }
 
-  return NextResponse.json({ request: buildDisplayRequest(step, sessionState) })
+  try {
+    return NextResponse.json({ request: buildDisplayRequest(step, sessionState) })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }

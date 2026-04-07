@@ -1,14 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Turnkey } from '@turnkey/sdk-server'
-
-function subOrgClient(subOrgId: string) {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: process.env.API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.API_PRIVATE_KEY!,
-    defaultOrganizationId: subOrgId,
-  }).apiClient()
-}
+import { subOrgClient } from '@/lib/turnkey-client'
 
 export async function POST(req: Request) {
   try {

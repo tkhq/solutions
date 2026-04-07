@@ -50,6 +50,11 @@ const SESSION_STATE_LABELS: Record<keyof SessionState, string> = {
   rootUserId:           'Root User ID',
 }
 
+// Maps every StepKind to its API call name and docs URL for the step header badge.
+// Note: catalog.ts (getCatalogItem) carries the same data for the ~50 browseable steps,
+// but several StepKinds (GET_WHO_AM_I, REMOVE_ORG_FEATURE, GET_VERIFIED_SUB_ORGS, etc.)
+// are only used in guided flows and are not in the catalog. This map ensures every
+// kind is covered regardless of catalog registration.
 const API_CALLS: Record<StepKind, { name: string; docs: string }> = {
   // Activities
   CREATE_SUB_ORG:        { name: 'create_sub_organization',  docs: 'https://docs.turnkey.com/api-reference/activities/create-sub-organization' },

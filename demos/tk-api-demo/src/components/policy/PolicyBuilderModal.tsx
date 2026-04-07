@@ -13,7 +13,8 @@ interface OrgUser {
 interface PolicyBuilderModalProps {
   open: boolean
   onClose: () => void
-  onApply: (policy: TurnkeyPolicy) => void
+  /** May be async — the modal waits for the promise to resolve before closing. */
+  onApply: (policy: TurnkeyPolicy) => void | Promise<void>
   title?: string
   subtitle?: string
   applyLabel?: string
@@ -54,7 +55,7 @@ export function PolicyBuilderModal({ open, onClose, onApply, title, subtitle, ap
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <PolicyBuilder
-            onApply={(policy) => { onApply(policy); onClose() }}
+            onApply={async (policy) => { await onApply(policy); onClose() }}
             applyLabel={applyLabel}
             initialPolicy={initialPolicy}
             orgUsers={orgUsers}

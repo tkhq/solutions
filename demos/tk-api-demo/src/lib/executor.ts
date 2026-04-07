@@ -1,34 +1,22 @@
-import { Turnkey, DEFAULT_ETHEREUM_ACCOUNTS } from '@turnkey/sdk-server'
+import { DEFAULT_ETHEREUM_ACCOUNTS } from '@turnkey/sdk-server'
 import { generateP256KeyPair } from '@turnkey/crypto'
 import { ethers } from 'ethers'
 import type { StepConfig, SessionState, StepResult } from '@/types/scenario'
+import { parentClient, subOrgClient, apiUserClient, getParentOrgName, getCachedParentOrgName } from '@/lib/turnkey-client'
 
-function parentClient() {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: process.env.API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.API_PRIVATE_KEY!,
-    defaultOrganizationId: process.env.ORGANIZATION_ID!,
-  }).apiClient()
+function defaultSubOrgName(orgName: string): string {
+  const now = new Date()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const yyyy = now.getFullYear()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const min = String(now.getMinutes()).padStart(2, '0')
+  const rand = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0')
+  return `Demo ${orgName} SubOrg ${mm}/${dd}/${yyyy} ${hh}:${min} #${rand}`
 }
 
-function subOrgClient(subOrgId: string) {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: process.env.API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.API_PRIVATE_KEY!,
-    defaultOrganizationId: subOrgId,
-  }).apiClient()
-}
-
-function apiUserClient(publicKey: string, privateKey: string, subOrgId: string) {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: publicKey,
-    apiPrivateKey: privateKey,
-    defaultOrganizationId: subOrgId,
-  }).apiClient()
-}
+// Pre-warm org name cache on module load so the sync preview has it ready
+getParentOrgName().catch(() => {})
 
 const STRIP_KEYS = new Set([
   'votes', 'fingerprint', 'canApprove', 'canReject', 'createdAt', 'updatedAt', 'appProofs',
@@ -125,7 +113,7 @@ export function buildDisplayRequest(step: StepConfig, state: SessionState): unkn
     case 'CREATE_SUB_ORG':
       return {
         organizationId: annotate(process.env.ORGANIZATION_ID ?? '<organizationId>', 'your root org — sub-orgs are always created under the parent'),
-        subOrganizationName: annotate(state.subOrganizationName ?? `my-app-user-${Date.now()}`, 'unique per end user — e.g. their user ID, email, or UUID'),
+        subOrganizationName: annotate(state.subOrganizationName ?? defaultSubOrgName(getCachedParentOrgName() ?? 'YourOrg'), 'unique per end user — e.g. their user ID, email, or UUID'),
         rootUsers: [
           {
             userName: annotate('Server Admin', 'label for this root user — visible in your Turnkey dashboard'),
@@ -678,7 +666,8 @@ export async function executeStep(
 
 async function executeCreateSubOrg(step: StepConfig, state: SessionState, override?: Record<string, unknown>): Promise<StepResult> {
   const client = parentClient()
-  const subOrganizationName = (override?.subOrganizationName as string | undefined) ?? `demo sub-org ${new Date().toISOString()}`
+  const orgName = await getParentOrgName()
+  const subOrganizationName = (override?.subOrganizationName as string | undefined) ?? defaultSubOrgName(orgName)
 
   const defaultParams = {
     organizationId: process.env.ORGANIZATION_ID!,

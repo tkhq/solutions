@@ -1,23 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Turnkey } from '@turnkey/sdk-server'
-
-function parentClient() {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: process.env.API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.API_PRIVATE_KEY!,
-    defaultOrganizationId: process.env.ORGANIZATION_ID!,
-  }).apiClient()
-}
-
-function subOrgClient(subOrgId: string) {
-  return new Turnkey({
-    apiBaseUrl: 'https://api.turnkey.com',
-    apiPublicKey: process.env.API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.API_PRIVATE_KEY!,
-    defaultOrganizationId: subOrgId,
-  }).apiClient()
-}
+import { parentClient, subOrgClient } from '@/lib/turnkey-client'
 
 const MAX_SUB_ORGS = 24
 

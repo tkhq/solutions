@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
   }
 
   const t0 = Date.now()
-  const result = await executeStep(step, sessionState, overrideRequest)
-  return NextResponse.json({ ...result, latencyMs: Date.now() - t0 })
+  try {
+    const result = await executeStep(step, sessionState, overrideRequest)
+    return NextResponse.json({ ...result, latencyMs: Date.now() - t0 })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }

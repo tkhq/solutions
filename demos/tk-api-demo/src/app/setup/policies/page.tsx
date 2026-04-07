@@ -90,7 +90,10 @@ export default function PolicyManagerPage() {
       const r = await fetch(`/api/policies?orgId=${encodeURIComponent(org.id)}`)
       const data = await r.json()
       if (data.error) { setPolicyError(data.error); return }
-      setPolicies(data.policies ?? [])
+      const policies = data.policies ?? []
+      setPolicies(policies)
+      // Keep policyCount in the org selector in sync
+      setOrgs((prev) => prev.map((o) => o.id === org.id ? { ...o, policyCount: policies.length } : o))
     } catch (e) {
       setPolicyError(String(e))
     } finally {
