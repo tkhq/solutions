@@ -13,9 +13,7 @@ export function middleware(req: NextRequest) {
 
   if (authHeader?.startsWith("Basic ")) {
     const base64 = authHeader.split(" ")[1];
-    const [providedUser, providedPass] = Buffer.from(base64, "base64")
-      .toString("utf-8")
-      .split(":");
+    const [providedUser, providedPass] = atob(base64).split(":");
 
     if (providedUser === username && providedPass === password) {
       return NextResponse.next();
