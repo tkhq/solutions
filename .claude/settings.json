@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Turnkey_Docs__query_docs_filesystem_turnkey",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pnpm add *)",
+      "Bash(python3 -c \"import json; p=json.load\\(open\\('/Users/henry/repos/solutions/demos/tk-api-demo/node_modules/@turnkey/core/package.json'\\)\\); print\\(p.get\\('main',''\\), p.get\\('module',''\\)\\)\")",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

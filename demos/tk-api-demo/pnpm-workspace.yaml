@@ -1,0 +1,4 @@
+allowBuilds:
+  sharp: false
+minimumReleaseAgeExclude:
+  - "@types/node@20.19.43"
