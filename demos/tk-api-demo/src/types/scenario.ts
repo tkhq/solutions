@@ -40,3 +40,10 @@ export interface StepResult {
   latencyMs?: number
   updatedState: SessionState
 }
+
+export type StepStatus = 'pending' | 'running' | 'success' | 'expected-failure' | 'error'
+
+export interface StepState {
+  status: StepStatus
+  result?: StepResult
+}

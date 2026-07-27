@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
-import type { Scenario, SessionState, StepResult, StepKind } from '@/types/scenario'
+import { ArchitectureDiagram } from '@/components/ArchitectureDiagram'
+import type { Scenario, SessionState, StepResult, StepKind, StepStatus, StepState } from '@/types/scenario'
 
 const API_CALLS: Record<StepKind, { name: string; docs: string }> = {
   CREATE_SUB_ORG:   { name: 'create_sub_organization', docs: 'https://docs.turnkey.com/api-reference/activities/create-sub-organization' },
@@ -90,13 +91,6 @@ function JsonTree({ value, depth = 0 }: { value: unknown; depth?: number }) {
   }
 
   return <span>{String(value)}</span>
-}
-
-type StepStatus = 'pending' | 'running' | 'success' | 'expected-failure' | 'error'
-
-interface StepState {
-  status: StepStatus
-  result?: StepResult
 }
 
 function StatusIcon({ status, index }: { status: StepStatus; index: number }) {
@@ -393,6 +387,17 @@ export default function DemoClient({ scenario }: { scenario: Scenario }) {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Live architecture diagram — builds up as each step succeeds */}
+          <div className="mb-5">
+            <ArchitectureDiagram
+              steps={scenario.steps}
+              stepStates={stepStates}
+              currentStep={currentStep}
+              session={sessionState}
+              parentOrgId=""
+            />
           </div>
 
           {/* Request + Response panels side by side */}
